@@ -18,6 +18,7 @@ pub trait Figure {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn data(&self) -> FigureData;
+    fn box_clone(&self) -> Box<dyn Figure>;
 }
 
 impl From<FigureData> for Box<dyn Figure> {
@@ -32,6 +33,12 @@ impl From<FigureData> for Box<dyn Figure> {
             )),
         };
         figure
+    }
+}
+
+impl Clone for Box<dyn Figure> {
+    fn clone(&self) -> Self {
+        self.box_clone()
     }
 }
 

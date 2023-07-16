@@ -39,6 +39,10 @@ impl Figure for Line {
     fn data(&self) -> crate::figure::FigureData {
         crate::figure::FigureData::Line(self.data.clone())
     }
+
+    fn box_clone(&self) -> Box<dyn Figure> {
+        Box::new(self.clone())
+    }
 }
 
 impl Line {

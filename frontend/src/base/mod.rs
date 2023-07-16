@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use lib::figure::Figure;
 use strum_macros::EnumIter;
 
@@ -11,7 +13,7 @@ pub enum ShouldAction {
     Rerender(DrawOption),
     BackToSelect,
     AddFigure(Box<dyn Figure>),
-    NotifyMousePositionChanged(f64, f64),
+    NotifyMousePositionChanged(VecDeque<(f64, f64)>),
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{collections::VecDeque, rc::Rc};
 
 use lib::{figure::Figure, message::ServerMessage};
 use yew::{html, Component, Context, Properties};
@@ -32,7 +32,7 @@ pub enum ChildRequestType {
     ShowChat(bool),
     ChangeMode(DrawModeType),
     AddFigure(Box<dyn Figure>),
-    NotifyMousePositionChanged(f64, f64),
+    NotifyMousePositionChanged(VecDeque<(f64, f64)>),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -247,10 +247,8 @@ fn handle_server_message(
             workspace.shared_users.remove(user_id);
             Some(UpdateReason::UserLeft)
         }
-        ServerMessage::NotifyUserMousePositionChanged(user_id, x, y) => {
-            workspace
-                .shared_users
-                .update_mouse_position(user_id, (x, y));
+        ServerMessage::NotifyUserMousePositionChanged(user_id, queue) => {
+            workspace.shared_users.update_mouse_position(user_id, queue);
             Some(UpdateReason::MousePositionChanged)
         }
     };
@@ -288,10 +286,10 @@ fn handle_child_request(
             }
             None
         }
-        ChildRequestType::NotifyMousePositionChanged(x, y) => {
+        ChildRequestType::NotifyMousePositionChanged(queue) => {
             if let Some(wss) = workspace.wss.as_ref() {
                 wss.send(lib::message::ClientMessage::NotifyMousePositionChanged(
-                    x, y,
+                    queue,
                 ));
             }
             None

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use lib::{
     common::Color,
@@ -42,7 +42,7 @@ pub enum DrawAreaMessage {
     Wheel(WheelEvent),
     //When the mouse position is checked at intervals by a timer,
     //this message occurs if the position has changed
-    MousePositionChanged(f64, f64),
+    MousePositionChanged(VecDeque<(f64, f64)>),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -62,6 +62,7 @@ pub struct DrawArea {
     keydown_closure: Option<Closure<dyn FnMut(KeyboardEvent)>>,
     draw_option: DrawOption,
     mouse_tracker: MouseTracker,
+    animation_handle: Rc<RefCell<Option<i32>>>,
 }
 
 impl Component for DrawArea {
@@ -87,6 +88,7 @@ impl Component for DrawArea {
             keydown_closure,
             draw_option: DrawOption::DrawAll,
             mouse_tracker,
+            animation_handle: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -133,6 +135,14 @@ impl Component for DrawArea {
         let canvas = self.data.convert_canvas();
         let context = self.data.convert_2d_context();
         let props = ctx.props();
+
+        if let Some(handle) = self.animation_handle.borrow_mut().take() {
+            web_sys::window()
+                .unwrap()
+                .cancel_animation_frame(handle)
+                .unwrap();
+        }
+
         self.render_2d_context(canvas, context, props);
 
         //let canvas = self.data.convert_canvas();
@@ -201,8 +211,8 @@ impl Component for DrawArea {
                     Some(ShouldAction::Rerender(DrawOption::DrawAll))
                 }
             }
-            DrawAreaMessage::MousePositionChanged(x, y) => {
-                Some(ShouldAction::NotifyMousePositionChanged(x, y))
+            DrawAreaMessage::MousePositionChanged(queue) => {
+                Some(ShouldAction::NotifyMousePositionChanged(queue))
             }
         };
 
@@ -222,10 +232,10 @@ impl Component for DrawArea {
                         .handler
                         .emit(ChildRequestType::AddFigure(figure));
                 }
-                ShouldAction::NotifyMousePositionChanged(x, y) => {
+                ShouldAction::NotifyMousePositionChanged(queue) => {
                     ctx.props()
                         .handler
-                        .emit(ChildRequestType::NotifyMousePositionChanged(x, y));
+                        .emit(ChildRequestType::NotifyMousePositionChanged(queue));
                 }
             }
         }
@@ -255,6 +265,13 @@ impl Component for DrawArea {
 }
 
 impl DrawArea {
+    fn request_animation_frame(f: &Closure<dyn FnMut()>) -> i32 {
+        web_sys::window()
+            .unwrap()
+            .request_animation_frame(f.as_ref().unchecked_ref())
+            .unwrap()
+    }
+
     fn render_2d_context(
         &mut self,
         canvas: HtmlCanvasElement,
@@ -267,39 +284,70 @@ impl DrawArea {
 
         canvas.set_width(canvas.client_width() as u32);
         canvas.set_height(canvas.client_height() as u32);
-        context.clear_rect(
-            0.0,
-            0.0,
-            canvas.client_width() as f64,
-            canvas.client_height() as f64,
-        );
 
-        let preview = self.data.take_preview();
+        let preview = Rc::new(RefCell::new(self.data.clone_preview()));
+        let coordinates = self.data.coordinates().clone();
+        let figure_list = props.figures.list();
+        let user_list = props.shared_users.list();
 
-        let drawer = Drawer::new(&context, self.data.coordinates());
+        let callback = Rc::new(RefCell::new(None));
+        let animation_handle_clone = self.animation_handle.clone();
 
-        let list = props.figures.list();
+        let callback_clone = callback.clone();
+        let closure = Closure::<dyn FnMut()>::new(move || {
+            // I don't know why call these to fix afterimage of shared user's cursor.
+            context.begin_path();
+            context.close_path();
+            //
 
-        let mut list_borrow_mut = list.borrow_mut();
+            context.clear_rect(
+                0.0,
+                0.0,
+                canvas.client_width() as f64,
+                canvas.client_height() as f64,
+            );
 
-        for figure in list_borrow_mut.iter_mut() {
-            figure.accept(&drawer);
-        }
+            let drawer = Drawer::new(&context, &coordinates);
 
-        if let Some(mut preview) = preview {
-            preview.accept(&drawer);
-            self.data.set_preview(Some(preview));
-        }
+            let mut list_borrow_mut = figure_list.borrow_mut();
 
-        let shared_users = props.shared_users.list();
-
-        let shared_users_borrow = shared_users.borrow();
-
-        for user in shared_users_borrow.iter() {
-            if !user.is_it_me() {
-                user.draw_mouse_cursor(&context, self.data.coordinates());
+            for figure in list_borrow_mut.iter_mut() {
+                figure.accept(&drawer);
             }
-        }
+
+            let preview_tmp = preview.borrow_mut().take();
+
+            if let Some(mut preview_tmp) = preview_tmp {
+                preview_tmp.accept(&drawer);
+                *preview.borrow_mut() = Some(preview_tmp);
+            }
+
+            let mut shared_users_borrow_mut = user_list.borrow_mut();
+
+            let mut mouse_position_all_empty = true;
+            for user in shared_users_borrow_mut.iter_mut() {
+                if !user.is_it_me() {
+                    user.draw_mouse_cursor(&context, &coordinates);
+                    if !user.check_mouse_position_queue_empty() {
+                        mouse_position_all_empty = false;
+                    }
+                }
+            }
+
+            if mouse_position_all_empty {
+                return;
+            }
+
+            let handle =
+                DrawArea::request_animation_frame(callback_clone.borrow().as_ref().unwrap());
+            *animation_handle_clone.borrow_mut() = Some(handle);
+        });
+
+        *callback.borrow_mut() = Some(closure);
+
+        *self.animation_handle.borrow_mut() = Some(DrawArea::request_animation_frame(
+            callback.borrow().as_ref().unwrap(),
+        ));
     }
 
     #[allow(dead_code)]

@@ -4,7 +4,7 @@ pub mod client;
 pub mod components;
 pub mod pages;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Coordinates {
     pub scroll_v_pos: f64,
     pub scroll_h_pos: f64,

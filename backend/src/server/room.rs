@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use lib::{
     figure::FigureData,
@@ -17,7 +20,7 @@ pub enum RoomMessage {
     LeaveUser(Arc<str>),
     AddFigure(FigureData),
     RequestInfo(Arc<str>, RequestType),
-    NotifyMousePositionChanged(Arc<str>, f64, f64),
+    NotifyMousePositionChanged(Arc<str>, VecDeque<(f64, f64)>),
 }
 
 pub struct Room {
@@ -103,15 +106,14 @@ impl Room {
                         }
                         _ => {}
                     },
-                    RoomMessage::NotifyMousePositionChanged(user_id, x, y) => {
+                    RoomMessage::NotifyMousePositionChanged(user_id, queue) => {
                         let mut users_lock = users_clone.lock().await;
                         broadcast_except_for(
                             &mut users_lock,
                             &user_id,
                             ServerMessage::NotifyUserMousePositionChanged(
                                 user_id.to_string(),
-                                x,
-                                y,
+                                queue,
                             ),
                         )
                         .await;

@@ -78,6 +78,10 @@ impl DrawAreaData {
         self.preview.take()
     }
 
+    pub fn clone_preview(&self) -> Option<Box<dyn Figure>> {
+        self.preview.clone()
+    }
+
     pub fn zoom_in(&mut self, event: WheelEvent) -> Option<ShouldAction> {
         let device_x = event.offset_x() as f64;
         let device_y = event.offset_y() as f64;

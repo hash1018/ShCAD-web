@@ -82,8 +82,8 @@ async fn handle_message(
                     ClientMessage::RequestInfo(request_type) => {
                         RoomMessage::RequestInfo(id.clone(), request_type)
                     }
-                    ClientMessage::NotifyMousePositionChanged(x, y) => {
-                        RoomMessage::NotifyMousePositionChanged(id.clone(), x, y)
+                    ClientMessage::NotifyMousePositionChanged(queue) => {
+                        RoomMessage::NotifyMousePositionChanged(id.clone(), queue)
                     }
                     _ => {
                         continue;
