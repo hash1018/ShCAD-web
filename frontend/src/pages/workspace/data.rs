@@ -103,7 +103,13 @@ impl SharedUsers {
         if let Some(position) = position {
             let mut list_borrow_mut = self.list.borrow_mut();
             let user = list_borrow_mut.get_mut(position).unwrap();
-            user.set_mouse_position(mouse_position);
+            user.set_mouse_position_queue(mouse_position);
+        }
+    }
+
+    pub fn clear_mouse_position_queue(&self) {
+        for user in self.list.borrow_mut().iter_mut() {
+            user.clear_mouse_position_queue();
         }
     }
 }
@@ -114,7 +120,7 @@ pub struct SharedUser {
     is_me: bool,
     color: Option<Color>,
     last_mouse_position: Option<(f64, f64)>,
-    mouse_position: VecDeque<(f64, f64)>,
+    mouse_position_queue: VecDeque<(f64, f64)>,
 }
 
 impl SharedUser {
@@ -124,7 +130,7 @@ impl SharedUser {
             is_me,
             color: None,
             last_mouse_position: None,
-            mouse_position: VecDeque::new(),
+            mouse_position_queue: VecDeque::new(),
         }
     }
 
@@ -140,11 +146,11 @@ impl SharedUser {
         self.color = Some(color);
     }
 
-    fn set_mouse_position(&mut self, mut mouse_position: VecDeque<(f64, f64)>) {
-        self.mouse_position.append(&mut mouse_position);
-        let len = self.mouse_position.len();
+    fn set_mouse_position_queue(&mut self, mut mouse_position_queue: VecDeque<(f64, f64)>) {
+        self.mouse_position_queue.append(&mut mouse_position_queue);
+        let len = self.mouse_position_queue.len();
         if len > 13 {
-            let last = self.mouse_position.pop_back().unwrap();
+            let last = self.mouse_position_queue.pop_back().unwrap();
             let len = len - 1;
             let diff = len - 12;
             let step = len / diff;
@@ -157,14 +163,14 @@ impl SharedUser {
             }
 
             let mut new_queue = VecDeque::new();
-            for (i, p) in self.mouse_position.iter().enumerate() {
+            for (i, p) in self.mouse_position_queue.iter().enumerate() {
                 if !indexes.contains(&i) {
                     new_queue.push_back(*p);
                 }
             }
             new_queue.push_back(last);
 
-            self.mouse_position = new_queue;
+            self.mouse_position_queue = new_queue;
         }
     }
 
@@ -173,7 +179,7 @@ impl SharedUser {
         context: &CanvasRenderingContext2d,
         coordinates: &Coordinates,
     ) {
-        if let Some(mouse_position) = self.mouse_position.pop_front() {
+        if let Some(mouse_position) = self.mouse_position_queue.pop_front() {
             if let Some(color) = self.color.as_ref() {
                 let color = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
                 context.set_fill_style(&color.into());
@@ -197,7 +203,14 @@ impl SharedUser {
     }
 
     pub fn check_mouse_position_queue_empty(&self) -> bool {
-        self.mouse_position.is_empty()
+        self.mouse_position_queue.is_empty()
+    }
+
+    pub fn clear_mouse_position_queue(&mut self) {
+        if let Some(mouse_position) = self.mouse_position_queue.pop_back() {
+            self.last_mouse_position = Some(mouse_position);
+            self.mouse_position_queue.clear();
+        }
     }
 }
 

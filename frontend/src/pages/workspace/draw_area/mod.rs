@@ -22,6 +22,7 @@ use crate::{
 
 use self::{
     data::{DrawAreaData, WebGLData},
+    global_event_handler::GlobalEventHandler,
     mouse_tracker::MouseTracker,
 };
 
@@ -32,7 +33,8 @@ use super::{
 };
 
 pub mod data;
-pub mod mouse_tracker;
+mod global_event_handler;
+mod mouse_tracker;
 
 pub enum DrawAreaMessage {
     MouseDown(MouseEvent),
@@ -43,6 +45,7 @@ pub enum DrawAreaMessage {
     //When the mouse position is checked at intervals by a timer,
     //this message occurs if the position has changed
     MousePositionChanged(VecDeque<(f64, f64)>),
+    VisibilityChange(bool),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -59,7 +62,7 @@ pub struct DrawArea {
     current_mode: Box<dyn DrawMode>,
     pan_mode: Option<PanMode>,
     webgl_data: Option<WebGLData>,
-    keydown_closure: Option<Closure<dyn FnMut(KeyboardEvent)>>,
+    global_event_handler: GlobalEventHandler,
     draw_option: DrawOption,
     mouse_tracker: MouseTracker,
     animation_handle: Rc<RefCell<Option<i32>>>,
@@ -73,7 +76,8 @@ impl Component for DrawArea {
         let data = DrawAreaData::new();
         let current_mode = SelectMode::new();
 
-        let keydown_closure = add_keydown_event(ctx);
+        let mut global_event_handler = GlobalEventHandler::new();
+        global_event_handler.init(ctx);
 
         let link = ctx.link().clone();
 
@@ -85,7 +89,7 @@ impl Component for DrawArea {
             current_mode: Box::new(current_mode),
             pan_mode: None,
             webgl_data: None,
-            keydown_closure,
+            global_event_handler,
             draw_option: DrawOption::DrawAll,
             mouse_tracker,
             animation_handle: Rc::new(RefCell::new(None)),
@@ -93,7 +97,7 @@ impl Component for DrawArea {
     }
 
     fn destroy(&mut self, _ctx: &Context<Self>) {
-        remove_keydown_event(self.keydown_closure.take());
+        self.global_event_handler.deinit();
         self.mouse_tracker.stop();
     }
 
@@ -213,6 +217,14 @@ impl Component for DrawArea {
             }
             DrawAreaMessage::MousePositionChanged(queue) => {
                 Some(ShouldAction::NotifyMousePositionChanged(queue))
+            }
+            DrawAreaMessage::VisibilityChange(visible) => {
+                if visible {
+                    ctx.props().shared_users.clear_mouse_position_queue();
+                    Some(ShouldAction::Rerender(DrawOption::DrawAll))
+                } else {
+                    None
+                }
             }
         };
 
@@ -416,31 +428,6 @@ fn _draw_triangle(
     );
 
     gl.draw_arrays(GL::TRIANGLES, 0, 3);
-}
-
-fn add_keydown_event(ctx: &yew::Context<DrawArea>) -> Option<Closure<dyn FnMut(KeyboardEvent)>> {
-    if let Some(window) = web_sys::window() {
-        let link = ctx.link().clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
-            link.send_message(DrawAreaMessage::KeyDown(event));
-        });
-        window
-            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-            .unwrap();
-        Some(closure)
-    } else {
-        None
-    }
-}
-
-fn remove_keydown_event(closure: Option<Closure<dyn FnMut(KeyboardEvent)>>) {
-    if let Some(window) = web_sys::window() {
-        if let Some(closure) = closure {
-            window
-                .remove_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-                .unwrap();
-        }
-    }
 }
 
 fn canvas_css(draw_area: &DrawArea, current_mode: DrawModeType) -> &'static str {
