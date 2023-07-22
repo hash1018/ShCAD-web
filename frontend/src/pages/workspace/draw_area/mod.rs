@@ -307,11 +307,6 @@ impl DrawArea {
 
         let callback_clone = callback.clone();
         let closure = Closure::<dyn FnMut()>::new(move || {
-            // I don't know why call these to fix afterimage of shared user's cursor.
-            context.begin_path();
-            context.close_path();
-            //
-
             context.clear_rect(
                 0.0,
                 0.0,

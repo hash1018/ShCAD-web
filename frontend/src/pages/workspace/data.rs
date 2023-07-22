@@ -121,6 +121,7 @@ pub struct SharedUser {
     color: Option<Color>,
     last_mouse_position: Option<(f64, f64)>,
     mouse_position_queue: VecDeque<(f64, f64)>,
+    text_info: Option<(f64, f64, Color)>,
 }
 
 impl SharedUser {
@@ -131,6 +132,7 @@ impl SharedUser {
             color: None,
             last_mouse_position: None,
             mouse_position_queue: VecDeque::new(),
+            text_info: None,
         }
     }
 
@@ -180,25 +182,26 @@ impl SharedUser {
         coordinates: &Coordinates,
     ) {
         if let Some(mouse_position) = self.mouse_position_queue.pop_front() {
-            if let Some(color) = self.color.as_ref() {
-                let color = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
-                context.set_fill_style(&color.into());
-                let (x, y) =
-                    convert_figure_to_device(coordinates, mouse_position.0, mouse_position.1);
-                context.rect(x, y, 20.0, 20.0);
-                context.fill();
-
-                self.last_mouse_position = Some(mouse_position);
-            }
+            let (x, y) = convert_figure_to_device(coordinates, mouse_position.0, mouse_position.1);
+            draw_cursor_shape(
+                context,
+                x,
+                y,
+                self.color.as_ref(),
+                &self.user_id,
+                &mut self.text_info,
+            );
+            self.last_mouse_position = Some(mouse_position);
         } else if let Some(mouse_position) = self.last_mouse_position.as_ref() {
-            if let Some(color) = self.color.as_ref() {
-                let color = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
-                context.set_fill_style(&color.into());
-                let (x, y) =
-                    convert_figure_to_device(coordinates, mouse_position.0, mouse_position.1);
-                context.rect(x, y, 20.0, 20.0);
-                context.fill();
-            }
+            let (x, y) = convert_figure_to_device(coordinates, mouse_position.0, mouse_position.1);
+            draw_cursor_shape(
+                context,
+                x,
+                y,
+                self.color.as_ref(),
+                &self.user_id,
+                &mut self.text_info,
+            );
         }
     }
 
@@ -257,4 +260,89 @@ impl PersonalColorGenerator {
 fn random() -> u8 {
     //0 ~ 255
     (Math::random() * 256.0) as u8
+}
+
+fn draw_cursor_shape(
+    context: &CanvasRenderingContext2d,
+    x: f64,
+    y: f64,
+    color: Option<&Color>,
+    id: &str,
+    text_info: &mut Option<(f64, f64, Color)>,
+) {
+    if let Some(color) = color {
+        let color_text = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
+        context.set_fill_style(&color_text.into());
+
+        context.begin_path();
+        context.move_to(x, y);
+        context.line_to(x + 7.0, y + 19.0);
+        context.line_to(x + 10.0, y + 10.0);
+        context.line_to(x + 19.0, y + 7.0);
+        context.close_path();
+        context.fill();
+
+        context.set_font("12px malgun gothic");
+        context.set_text_baseline("center");
+
+        let (width, height, color) = if let Some((width, height, color)) = text_info {
+            (*width, *height, *color)
+        } else {
+            let metrics = context.measure_text(id).unwrap();
+            let width = metrics.width();
+            let height = metrics.font_bounding_box_ascent() + metrics.font_bounding_box_descent();
+
+            let color = pick_text_color_based_on_background(color);
+
+            *text_info = Some((width, height, color));
+
+            (
+                text_info.as_ref().unwrap().0,
+                text_info.as_ref().unwrap().1,
+                text_info.as_ref().unwrap().2,
+            )
+        };
+
+        draw_rounded_rect(context, x - 6.0, y + 24.0, width + 12.0, height + 8.0);
+
+        let color = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
+        context.set_fill_style(&color.into());
+        context.fill_text(id, x, y + 24.0 + height).unwrap();
+    }
+}
+
+fn pick_text_color_based_on_background(background: &Color) -> Color {
+    let luminance = (0.299 * f64::from(background.r)
+        + 0.587 * f64::from(background.g)
+        + 0.114 * f64::from(background.b)) as u8;
+
+    if luminance > 128 {
+        Color::new(0, 0, 0, 255)
+    } else {
+        Color::new(255, 255, 255, 255)
+    }
+}
+
+fn draw_rounded_rect(context: &CanvasRenderingContext2d, x: f64, y: f64, width: f64, height: f64) {
+    let radius = height / 2.0;
+    context.begin_path();
+    context.move_to(x, y + radius);
+    context
+        .arc_to(x, y + height, x + radius, y + height, radius)
+        .unwrap();
+    context
+        .arc_to(
+            x + width,
+            y + height,
+            x + width,
+            y + height - radius,
+            radius,
+        )
+        .unwrap();
+    context
+        .arc_to(x + width, y, x + width - radius, y, radius)
+        .unwrap();
+    context.arc_to(x, y, x, y + radius, radius).unwrap();
+    context.close_path();
+    context.fill();
 }

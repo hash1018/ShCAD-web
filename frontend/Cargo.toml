@@ -36,5 +36,6 @@ features = [
   'WebGlShader',
   'WebGlUniformLocation',
   'CanvasRenderingContext2d',
+  'TextMetrics',
 ]
 

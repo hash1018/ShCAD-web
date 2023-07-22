@@ -26,6 +26,7 @@ impl Visitor for Drawer<'_> {
         self.context.begin_path();
         self.context.move_to(start_x, start_y);
         self.context.line_to(end_x, end_y);
+        self.context.close_path();
         self.context.stroke();
     }
 }
