@@ -54,16 +54,33 @@ impl Component for Login {
         let hide_create_button = ctx.props().room_id.is_some();
 
         html! {
-           <div>
-               <input id="username" ref={&self.user_name_ref} type="text" placeholder="username" />
+           <div style="text-align:center;">
+                <h1 style="font-size: 44px;">{"Sketchdove"}</h1>
+                <h3>{"Real-time whiteboard"}</h3>
+                <div>
+                    <label>{"Enter your name"}</label>
+                    <br/>
+                    <input id="username" ref={&self.user_name_ref} type="text" placeholder="username" />
+               </div>
+               <div/>
                if !hide_create_button {
-                    <input id="room_id" ref={&self.room_id_ref} type="text" placeholder="room id" />
+                    <div>
+                        <label>{"Enter room id"}</label>
+                        <br/>
+                        <input id="room_id" ref={&self.room_id_ref} type="text" placeholder="room id" />
+                    </div>
                }
-
-               <button onclick={join_button_clicked}> {"Join"} </button>
-               if !hide_create_button {
-                    <button onclick={create_button_clicked}> {"Create Room"} </button>
-               }
+               <div>
+                    <button onclick={join_button_clicked}> {"Join"} </button>
+                    <br/>
+                    if !hide_create_button {
+                        <label>{"or"}</label>
+                        <br/>
+                        <label>{"Create room"}</label>
+                        <br/>
+                        <button onclick={create_button_clicked}> {"Create"} </button>
+                    }
+               </div>
            </div>
         }
     }
