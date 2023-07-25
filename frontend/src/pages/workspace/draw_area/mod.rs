@@ -156,16 +156,18 @@ impl Component for DrawArea {
 
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let should_action = match msg {
-            DrawAreaMessage::MouseDown(event) => {
-                if event.button() == 1 {
+            DrawAreaMessage::MouseDown(event) => match event.button() {
+                0 => self
+                    .current_mode
+                    .mouse_left_press_event(event, &mut self.data),
+                1 => {
                     let mut pan_mode = PanMode::new();
                     let should_action = pan_mode.mouse_press_event(event, &mut self.data);
                     self.pan_mode = Some(pan_mode);
                     should_action
-                } else {
-                    self.current_mode.mouse_press_event(event, &mut self.data)
                 }
-            }
+                _ => None,
+            },
             DrawAreaMessage::MouseMove(event) => {
                 let (x, y) = convert_device_to_figure(
                     self.data.coordinates(),

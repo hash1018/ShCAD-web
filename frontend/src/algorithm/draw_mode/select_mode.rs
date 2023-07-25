@@ -12,7 +12,7 @@ impl SelectMode {
 }
 
 impl DrawMode for SelectMode {
-    fn mouse_press_event(
+    fn mouse_left_press_event(
         &mut self,
         _event: web_sys::MouseEvent,
         _data: &mut DrawAreaData,

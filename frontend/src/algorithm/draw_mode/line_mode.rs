@@ -23,7 +23,7 @@ impl LineMode {
 }
 
 impl DrawMode for LineMode {
-    fn mouse_press_event(
+    fn mouse_left_press_event(
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,

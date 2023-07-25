@@ -14,7 +14,7 @@ pub mod pan_mode;
 pub mod select_mode;
 
 pub trait DrawMode {
-    fn mouse_press_event(
+    fn mouse_left_press_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
