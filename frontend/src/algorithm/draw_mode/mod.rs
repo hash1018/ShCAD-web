@@ -1,8 +1,10 @@
+use std::rc::Rc;
+
 use web_sys::MouseEvent;
 
 use crate::{
     base::{DrawModeType, ShouldAction},
-    pages::workspace::draw_area::data::DrawAreaData,
+    pages::workspace::{data::FigureList, draw_area::data::DrawAreaData},
 };
 
 use self::{line_mode::LineMode, select_mode::SelectMode};
@@ -18,11 +20,13 @@ pub trait DrawMode {
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
+        figures: Rc<FigureList>,
     ) -> Option<ShouldAction>;
     fn mouse_mouse_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
+        figures: Rc<FigureList>,
     ) -> Option<ShouldAction>;
     fn mouse_release_event(
         &mut self,

@@ -1,9 +1,14 @@
+use std::rc::Rc;
+
 use lib::{
     common::Color,
     figure::{leaf::line::Line, Figure},
 };
 
-use crate::{base::DrawOption, pages::workspace::draw_area::data::DrawAreaData};
+use crate::{
+    base::DrawOption,
+    pages::workspace::{data::FigureList, draw_area::data::DrawAreaData},
+};
 
 use super::{DrawMode, ShouldAction};
 
@@ -27,6 +32,7 @@ impl DrawMode for LineMode {
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
+        _figures: Rc<FigureList>,
     ) -> Option<ShouldAction> {
         let (x, y) = self.convert_figure_coordinates(&event, data);
 
@@ -48,6 +54,7 @@ impl DrawMode for LineMode {
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
+        _figures: Rc<FigureList>,
     ) -> Option<ShouldAction> {
         if self.start_x.is_some() && self.start_y.is_some() {
             let preview = data.take_preview();
