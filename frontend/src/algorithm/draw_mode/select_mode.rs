@@ -31,7 +31,7 @@ impl DrawMode for SelectMode {
         let figure_list = figures.list();
         let mut list_borrow_mut = figure_list.borrow_mut();
 
-        for figure in list_borrow_mut.iter_mut() {
+        for (_, figure) in list_borrow_mut.iter_mut() {
             figure.accept(&finder);
             if *found.borrow() {
                 log::info!("found!");

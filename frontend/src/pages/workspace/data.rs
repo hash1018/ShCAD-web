@@ -1,13 +1,17 @@
 use js_sys::Math;
 use lib::{common::Color, figure::Figure};
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, VecDeque},
+    rc::Rc,
+};
 use web_sys::CanvasRenderingContext2d;
 
 use crate::{algorithm::coordinates_converter::convert_figure_to_device, Coordinates};
 
 #[derive(Default)]
 pub struct FigureList {
-    list: Rc<RefCell<Vec<Box<dyn Figure>>>>,
+    list: Rc<RefCell<BTreeMap<usize, Box<dyn Figure>>>>,
 }
 
 impl PartialEq for FigureList {
@@ -19,19 +23,19 @@ impl PartialEq for FigureList {
 impl FigureList {
     pub fn new() -> FigureList {
         FigureList {
-            list: Rc::new(RefCell::new(Vec::new())),
+            list: Rc::new(RefCell::new(BTreeMap::new())),
         }
     }
 
-    pub fn push(&self, figure: Box<dyn Figure>) {
-        self.list.borrow_mut().push(figure);
+    pub fn insert(&self, id: usize, figure: Box<dyn Figure>) {
+        self.list.borrow_mut().insert(id, figure);
     }
 
-    pub fn append(&self, mut figures: Vec<Box<dyn Figure>>) {
+    pub fn append(&self, mut figures: BTreeMap<usize, Box<dyn Figure>>) {
         self.list.borrow_mut().append(&mut figures);
     }
 
-    pub fn list(&self) -> Rc<RefCell<Vec<Box<dyn Figure>>>> {
+    pub fn list(&self) -> Rc<RefCell<BTreeMap<usize, Box<dyn Figure>>>> {
         self.list.clone()
     }
 }

@@ -1,6 +1,9 @@
 use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
+    collections::{BTreeMap, HashMap, VecDeque},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 use lib::{
@@ -27,7 +30,7 @@ pub struct Room {
     id: Arc<str>,
     server_app_sender: Sender<ServerAppMessage>,
     users: Arc<Mutex<HashMap<Arc<str>, User>>>,
-    figures: Arc<Mutex<Vec<FigureData>>>,
+    figures: Arc<Mutex<BTreeMap<usize, FigureData>>>,
     sender: Sender<RoomMessage>, //Pass to new_user so that room's receiver can receive a message from user.
 }
 
@@ -39,7 +42,7 @@ impl Room {
             id,
             server_app_sender,
             users: Arc::new(Mutex::new(HashMap::new())),
-            figures: Arc::new(Mutex::new(Vec::new())),
+            figures: Arc::new(Mutex::new(BTreeMap::new())),
             sender,
         };
 
@@ -76,17 +79,20 @@ impl Room {
                         }
                     }
                     RoomMessage::AddFigure(data) => {
-                        figures_clone.lock().await.push(data.clone());
+                        static FIGURE_ID: AtomicUsize = AtomicUsize::new(1);
+                        let new_id = FIGURE_ID.fetch_add(1, Ordering::Relaxed);
+
+                        figures_clone.lock().await.insert(new_id, data.clone());
                         let mut users_lock = users_clone.lock().await;
-                        broadcast(&mut users_lock, ServerMessage::FigureAdded(data)).await;
+                        broadcast(&mut users_lock, ServerMessage::FigureAdded(new_id, data)).await;
                     }
                     RoomMessage::RequestInfo(user_id, request_type) => match request_type {
                         RequestType::CurrentFigures => {
                             let mut users_lock = users_clone.lock().await;
-                            let vec = figures_clone.lock().await.clone();
+                            let figures = figures_clone.lock().await.clone();
                             if let Some(user) = users_lock.get_mut(&user_id) {
                                 user.send_message(ServerMessage::ResponseInfo(
-                                    ResponseType::CurrentFigures(vec),
+                                    ResponseType::CurrentFigures(figures),
                                 ))
                                 .await;
                             }

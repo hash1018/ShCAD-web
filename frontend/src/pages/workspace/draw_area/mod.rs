@@ -326,7 +326,7 @@ impl DrawArea {
 
             let mut list_borrow_mut = figure_list.borrow_mut();
 
-            for figure in list_borrow_mut.iter_mut() {
+            for (_, figure) in list_borrow_mut.iter_mut() {
                 figure.accept(&drawer);
             }
 

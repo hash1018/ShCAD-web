@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ use crate::figure::FigureData;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerMessage {
     UserJoined(UserId),
-    FigureAdded(FigureData),
+    FigureAdded(usize, FigureData),
     ResponseInfo(ResponseType),
     UserLeft(UserId),
     NotifyUserMousePositionChanged(UserId, VecDeque<(f64, f64)>),
@@ -32,7 +32,7 @@ pub enum RequestType {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ResponseType {
-    CurrentFigures(Vec<FigureData>),
+    CurrentFigures(BTreeMap<usize, FigureData>),
     CurrentSharedUsers(Vec<String>),
     ResponseRoomExist(bool),
     ResponseUserExist(Option<bool>),

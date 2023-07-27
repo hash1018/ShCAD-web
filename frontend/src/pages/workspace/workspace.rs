@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, rc::Rc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    rc::Rc,
+};
 
 use lib::{figure::Figure, message::ServerMessage};
 use yew::{html, Component, Context, Properties};
@@ -183,8 +186,8 @@ fn handle_server_message(
     msg: ServerMessage,
 ) -> Option<UpdateReason> {
     let update_reason = match msg {
-        ServerMessage::FigureAdded(data) => {
-            workspace.figures.push(data.into());
+        ServerMessage::FigureAdded(id, data) => {
+            workspace.figures.insert(id, data.into());
             Some(UpdateReason::FigureAdded)
         }
         ServerMessage::ResponseInfo(response_type) => match response_type {
@@ -192,11 +195,11 @@ fn handle_server_message(
                 if datas.is_empty() {
                     None
                 } else {
-                    let mut vec = Vec::new();
-                    for data in datas {
-                        vec.push(data.into());
+                    let mut tree = BTreeMap::new();
+                    for (id, data) in datas {
+                        tree.insert(id, data.into());
                     }
-                    workspace.figures.append(vec);
+                    workspace.figures.append(tree);
                     Some(UpdateReason::GetCurrentFigures)
                 }
             }
