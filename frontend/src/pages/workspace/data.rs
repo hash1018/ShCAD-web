@@ -7,36 +7,74 @@ use std::{
 };
 use web_sys::CanvasRenderingContext2d;
 
-use crate::{algorithm::coordinates_converter::convert_figure_to_device, Coordinates};
+use crate::{
+    algorithm::{
+        coordinates_converter::convert_figure_to_device,
+        visitor::{drawer::Drawer, finder::Finder},
+    },
+    Coordinates,
+};
 
 #[derive(Default)]
-pub struct FigureList {
-    list: Rc<RefCell<BTreeMap<usize, Box<dyn Figure>>>>,
+pub struct FigureMaintainer {
+    default_list: BTreeMap<usize, Box<dyn Figure>>,
+    preview: Option<Box<dyn Figure>>,
 }
 
-impl PartialEq for FigureList {
-    fn eq(&self, other: &Self) -> bool {
-        self.list.borrow().len() == other.list.borrow().len()
+impl PartialEq for FigureMaintainer {
+    fn eq(&self, _other: &Self) -> bool {
+        true
     }
 }
 
-impl FigureList {
-    pub fn new() -> FigureList {
-        FigureList {
-            list: Rc::new(RefCell::new(BTreeMap::new())),
+impl FigureMaintainer {
+    pub fn new() -> FigureMaintainer {
+        FigureMaintainer {
+            default_list: BTreeMap::new(),
+            preview: None,
         }
     }
 
-    pub fn insert(&self, id: usize, figure: Box<dyn Figure>) {
-        self.list.borrow_mut().insert(id, figure);
+    pub fn insert_to_default(&mut self, id: usize, figure: Box<dyn Figure>) {
+        self.default_list.insert(id, figure);
     }
 
-    pub fn append(&self, mut figures: BTreeMap<usize, Box<dyn Figure>>) {
-        self.list.borrow_mut().append(&mut figures);
+    pub fn append_to_default(&mut self, mut figures: BTreeMap<usize, Box<dyn Figure>>) {
+        self.default_list.append(&mut figures);
     }
 
-    pub fn list(&self) -> Rc<RefCell<BTreeMap<usize, Box<dyn Figure>>>> {
-        self.list.clone()
+    pub fn set_preview(&mut self, preview: Option<Box<dyn Figure>>) {
+        self.preview = preview;
+    }
+
+    pub fn take_preview(&mut self) -> Option<Box<dyn Figure>> {
+        self.preview.take()
+    }
+
+    pub fn clone_preview(&self) -> Option<Box<dyn Figure>> {
+        self.preview.clone()
+    }
+
+    pub fn draw_default(&mut self, drawer: &Drawer) {
+        for (_, figure) in self.default_list.iter_mut() {
+            figure.accept(drawer);
+        }
+
+        if let Some(mut preview_tmp) = self.preview.take() {
+            preview_tmp.accept(drawer);
+            self.preview = Some(preview_tmp);
+        }
+    }
+
+    pub fn search(&mut self, finder: &Finder) -> Option<usize> {
+        for (id, figure) in self.default_list.iter_mut() {
+            figure.accept(finder);
+            if finder.found() {
+                return Some(*id);
+            }
+        }
+
+        None
     }
 }
 

@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, VecDeque},
     rc::Rc,
 };
@@ -19,7 +20,7 @@ use crate::{
 };
 
 use super::{
-    data::{FigureList, SharedUser, SharedUsers},
+    data::{FigureMaintainer, SharedUser, SharedUsers},
     UpdateReason,
 };
 
@@ -48,7 +49,7 @@ pub struct Workspace {
     _event_bus: Option<Box<dyn Bridge<EventBus>>>,
     show_chat: bool,
     current_mode: DrawModeType,
-    figures: Rc<FigureList>,
+    figure_maintainer: Rc<RefCell<FigureMaintainer>>,
     shared_users: Rc<SharedUsers>,
     logined: bool,
     update_reason: Option<UpdateReason>,
@@ -70,7 +71,7 @@ impl Component for Workspace {
             _event_bus: None,
             show_chat: false,
             current_mode: DrawModeType::SelectMode,
-            figures: Rc::new(FigureList::new()),
+            figure_maintainer: Rc::new(RefCell::new(FigureMaintainer::new())),
             shared_users: Rc::new(SharedUsers::new()),
             logined: false,
             update_reason: None,
@@ -112,7 +113,7 @@ impl Workspace {
         let current_mode = self.current_mode;
         let handler_clone = handler.clone();
         let handler_clone2 = handler.clone();
-        let figures = self.figures.clone();
+        let figure_maintainer = self.figure_maintainer.clone();
         let update_reason = self.update_reason.clone();
         let shared_users = self.shared_users.clone();
 
@@ -120,7 +121,7 @@ impl Workspace {
             <body>
                 <div class="top"> <TitleBar {handler} {show_chat} /> </div>
                 <div class="content">
-                    <DrawArea handler = {handler_clone} {current_mode} {figures} {update_reason} {shared_users} />
+                    <DrawArea handler = {handler_clone} {current_mode} {figure_maintainer} {update_reason} {shared_users} />
                     <div class="left"> <ToolBox handler = {handler_clone2} {current_mode} /> </div>
                     if show_chat {
                         <div class="chat_position"> <Chat /> </div>
@@ -187,7 +188,10 @@ fn handle_server_message(
 ) -> Option<UpdateReason> {
     let update_reason = match msg {
         ServerMessage::FigureAdded(id, data) => {
-            workspace.figures.insert(id, data.into());
+            workspace
+                .figure_maintainer
+                .borrow_mut()
+                .insert_to_default(id, data.into());
             Some(UpdateReason::FigureAdded)
         }
         ServerMessage::ResponseInfo(response_type) => match response_type {
@@ -199,7 +203,10 @@ fn handle_server_message(
                     for (id, data) in datas {
                         tree.insert(id, data.into());
                     }
-                    workspace.figures.append(tree);
+                    workspace
+                        .figure_maintainer
+                        .borrow_mut()
+                        .append_to_default(tree);
                     Some(UpdateReason::GetCurrentFigures)
                 }
             }

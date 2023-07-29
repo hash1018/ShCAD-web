@@ -70,3 +70,31 @@ impl Visitor for DrawerGL<'_> {
         self.gl.draw_arrays(WebGlRenderingContext::LINES, 0, 2);
     }
 }
+
+pub struct SelectedDrawer<'a> {
+    context: &'a CanvasRenderingContext2d,
+    coordinates: &'a Coordinates,
+}
+
+impl<'a> SelectedDrawer<'a> {
+    pub fn new(context: &'a CanvasRenderingContext2d, coordinates: &'a Coordinates) -> Self {
+        Self {
+            context,
+            coordinates,
+        }
+    }
+}
+
+impl Visitor for SelectedDrawer<'_> {
+    fn visit_line(&self, line: &mut Line) {
+        let (start_x, start_y) =
+            convert_figure_to_device(self.coordinates, line.start_x(), line.start_y());
+        let (end_x, end_y) = convert_figure_to_device(self.coordinates, line.end_x(), line.end_y());
+
+        self.context.begin_path();
+        self.context.move_to(start_x, start_y);
+        self.context.line_to(end_x, end_y);
+        self.context.close_path();
+        self.context.stroke();
+    }
+}

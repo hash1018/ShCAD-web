@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use lib::{
     common::Color,
@@ -7,7 +7,7 @@ use lib::{
 
 use crate::{
     base::DrawOption,
-    pages::workspace::{data::FigureList, draw_area::data::DrawAreaData},
+    pages::workspace::{data::FigureMaintainer, draw_area::data::DrawAreaData},
 };
 
 use super::{DrawMode, ShouldAction};
@@ -32,12 +32,12 @@ impl DrawMode for LineMode {
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
-        _figures: Rc<FigureList>,
+        figure_maintainer: Rc<RefCell<FigureMaintainer>>,
     ) -> Option<ShouldAction> {
         let (x, y) = self.convert_figure_coordinates(&event, data);
 
         if let (Some(_), Some(_)) = (self.start_x.take(), self.start_y.take()) {
-            if let Some(preview) = data.take_preview() {
+            if let Some(preview) = figure_maintainer.borrow_mut().take_preview() {
                 let preview = set_end_point_to_preview(preview, x, y);
                 return Some(ShouldAction::AddFigure(preview));
             }
@@ -45,7 +45,9 @@ impl DrawMode for LineMode {
             self.start_x = Some(x);
             self.start_y = Some(y);
             let line = Line::new(x, y, x, y, Color::new(0, 0, 0, 255));
-            data.set_preview(Some(Box::new(line)));
+            figure_maintainer
+                .borrow_mut()
+                .set_preview(Some(Box::new(line)));
         }
         None
     }
@@ -54,14 +56,14 @@ impl DrawMode for LineMode {
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
-        _figures: Rc<FigureList>,
+        figure_maintainer: Rc<RefCell<FigureMaintainer>>,
     ) -> Option<ShouldAction> {
         if self.start_x.is_some() && self.start_y.is_some() {
-            let preview = data.take_preview();
+            let preview = figure_maintainer.borrow_mut().take_preview();
             if let Some(preview) = preview {
                 let (x, y) = self.convert_figure_coordinates(&event, data);
                 let preview = set_end_point_to_preview(preview, x, y);
-                data.set_preview(Some(preview));
+                figure_maintainer.borrow_mut().set_preview(Some(preview));
                 return Some(ShouldAction::Rerender(DrawOption::DrawAll));
             }
         }

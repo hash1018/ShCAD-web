@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     algorithm::visitor::finder::Finder,
-    pages::workspace::{data::FigureList, draw_area::data::DrawAreaData},
+    pages::workspace::{data::FigureMaintainer, draw_area::data::DrawAreaData},
 };
 
 use super::{DrawMode, ShouldAction};
@@ -21,25 +21,15 @@ impl DrawMode for SelectMode {
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
-        figures: Rc<FigureList>,
+        figure_maintainer: Rc<RefCell<FigureMaintainer>>,
     ) -> Option<ShouldAction> {
         let (x, y) = self.convert_figure_coordinates(&event, data);
 
-        let found = Rc::new(RefCell::new(false));
-        let finder = Finder::new(found.clone(), (x, y), data.coordinates().zoom_rate, 6.0);
+        let finder = Finder::new((x, y), data.coordinates().zoom_rate, 6.0);
 
-        let figure_list = figures.list();
-        let mut list_borrow_mut = figure_list.borrow_mut();
-
-        for (_, figure) in list_borrow_mut.iter_mut() {
-            figure.accept(&finder);
-            if *found.borrow() {
-                log::info!("found!");
-                break;
-            }
-        }
-
-        if !*found.borrow() {
+        if let Some(id) = figure_maintainer.borrow_mut().search(&finder) {
+            log::info!("found id = {id}");
+        } else {
             log::info!("not found");
         }
 
@@ -50,7 +40,7 @@ impl DrawMode for SelectMode {
         &mut self,
         _event: web_sys::MouseEvent,
         _data: &mut DrawAreaData,
-        _figures: Rc<FigureList>,
+        _figures: Rc<RefCell<FigureMaintainer>>,
     ) -> Option<ShouldAction> {
         None
     }

@@ -27,7 +27,7 @@ use self::{
 };
 
 use super::{
-    data::{FigureList, SharedUsers},
+    data::{FigureMaintainer, SharedUsers},
     workspace::ChildRequestType,
     UpdateReason,
 };
@@ -52,7 +52,7 @@ pub enum DrawAreaMessage {
 pub struct DrawAreaProps {
     pub handler: Callback<ChildRequestType>,
     pub current_mode: DrawModeType,
-    pub figures: Rc<FigureList>,
+    pub figure_maintainer: Rc<RefCell<FigureMaintainer>>,
     pub update_reason: Option<UpdateReason>,
     pub shared_users: Rc<SharedUsers>,
 }
@@ -109,7 +109,13 @@ impl Component for DrawArea {
                 UpdateReason::ChangeMode => {
                     self.current_mode = ctx.props().current_mode.into();
 
-                    if self.data.take_preview().is_some() {
+                    if ctx
+                        .props()
+                        .figure_maintainer
+                        .borrow_mut()
+                        .take_preview()
+                        .is_some()
+                    {
                         self.draw_option = DrawOption::DrawAll;
                     } else {
                         self.draw_option = DrawOption::Remain;
@@ -160,7 +166,7 @@ impl Component for DrawArea {
                 0 => self.current_mode.mouse_left_press_event(
                     event,
                     &mut self.data,
-                    ctx.props().figures.clone(),
+                    ctx.props().figure_maintainer.clone(),
                 ),
                 1 => {
                     let mut pan_mode = PanMode::new();
@@ -186,7 +192,7 @@ impl Component for DrawArea {
                     self.current_mode.mouse_mouse_event(
                         event,
                         &mut self.data,
-                        ctx.props().figures.clone(),
+                        ctx.props().figure_maintainer.clone(),
                     )
                 }
             }
@@ -305,9 +311,8 @@ impl DrawArea {
         canvas.set_width(canvas.client_width() as u32);
         canvas.set_height(canvas.client_height() as u32);
 
-        let preview = Rc::new(RefCell::new(self.data.clone_preview()));
         let coordinates = self.data.coordinates().clone();
-        let figure_list = props.figures.list();
+        let figure_maintainer = props.figure_maintainer.clone();
         let user_list = props.shared_users.list();
 
         let callback = Rc::new(RefCell::new(None));
@@ -324,18 +329,7 @@ impl DrawArea {
 
             let drawer = Drawer::new(&context, &coordinates);
 
-            let mut list_borrow_mut = figure_list.borrow_mut();
-
-            for (_, figure) in list_borrow_mut.iter_mut() {
-                figure.accept(&drawer);
-            }
-
-            let preview_tmp = preview.borrow_mut().take();
-
-            if let Some(mut preview_tmp) = preview_tmp {
-                preview_tmp.accept(&drawer);
-                *preview.borrow_mut() = Some(preview_tmp);
-            }
+            figure_maintainer.borrow_mut().draw_default(&drawer);
 
             let mut shared_users_borrow_mut = user_list.borrow_mut();
 
