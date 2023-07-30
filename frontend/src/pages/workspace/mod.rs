@@ -17,4 +17,6 @@ pub enum UpdateReason {
     ShowChat,
     ChangeMode,
     MousePositionChanged,
+    FigureSelected,
+    FigureUnselectedAll,
 }

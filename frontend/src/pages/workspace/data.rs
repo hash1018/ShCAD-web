@@ -2,7 +2,7 @@ use js_sys::Math;
 use lib::{common::Color, figure::Figure};
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     rc::Rc,
 };
 use web_sys::CanvasRenderingContext2d;
@@ -10,7 +10,10 @@ use web_sys::CanvasRenderingContext2d;
 use crate::{
     algorithm::{
         coordinates_converter::convert_figure_to_device,
-        visitor::{drawer::Drawer, finder::Finder},
+        visitor::{
+            drawer::{Drawer, SelectedDrawer},
+            finder::Finder,
+        },
     },
     Coordinates,
 };
@@ -18,6 +21,7 @@ use crate::{
 #[derive(Default)]
 pub struct FigureMaintainer {
     default_list: BTreeMap<usize, Box<dyn Figure>>,
+    selected_list: BTreeSet<usize>,
     preview: Option<Box<dyn Figure>>,
 }
 
@@ -31,6 +35,7 @@ impl FigureMaintainer {
     pub fn new() -> FigureMaintainer {
         FigureMaintainer {
             default_list: BTreeMap::new(),
+            selected_list: BTreeSet::new(),
             preview: None,
         }
     }
@@ -55,14 +60,26 @@ impl FigureMaintainer {
         self.preview.clone()
     }
 
-    pub fn draw_default(&mut self, drawer: &Drawer) {
+    pub fn draw_default(&mut self, context: &CanvasRenderingContext2d, coordinates: &Coordinates) {
+        let drawer = Drawer::new(context, coordinates);
+
         for (_, figure) in self.default_list.iter_mut() {
-            figure.accept(drawer);
+            figure.accept(&drawer);
         }
 
         if let Some(mut preview_tmp) = self.preview.take() {
-            preview_tmp.accept(drawer);
+            preview_tmp.accept(&drawer);
             self.preview = Some(preview_tmp);
+        }
+    }
+
+    pub fn draw_selected(&mut self, context: &CanvasRenderingContext2d, coordinates: &Coordinates) {
+        let drawer: SelectedDrawer<'_> = SelectedDrawer::new(context, coordinates);
+
+        for id in self.selected_list.iter() {
+            if let Some(figure) = self.default_list.get_mut(id) {
+                figure.accept(&drawer);
+            }
         }
     }
 
@@ -75,6 +92,28 @@ impl FigureMaintainer {
         }
 
         None
+    }
+
+    pub fn select(&mut self, mut ids: BTreeSet<usize>) {
+        self.selected_list.append(&mut ids);
+    }
+
+    pub fn unselect(&mut self, ids: BTreeSet<usize>) {
+        for id in ids.iter() {
+            self.selected_list.remove(id);
+        }
+    }
+
+    pub fn unselect_all(&mut self) {
+        self.selected_list.clear();
+    }
+
+    pub fn selected_list_len(&self) -> usize {
+        self.selected_list.len()
+    }
+
+    pub fn check_selected(&self, id: usize) -> bool {
+        self.selected_list.get(&id).is_some()
     }
 }
 

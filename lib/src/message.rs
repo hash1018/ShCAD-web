@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +11,8 @@ pub enum ServerMessage {
     ResponseInfo(ResponseType),
     UserLeft(UserId),
     NotifyUserMousePositionChanged(UserId, VecDeque<(f64, f64)>),
+    FigureSelected(UserId, BTreeSet<usize>),
+    FigureUnselectedAll(UserId),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -20,6 +22,8 @@ pub enum ClientMessage {
     AddFigure(FigureData),
     RequestInfo(RequestType),
     NotifyMousePositionChanged(VecDeque<(f64, f64)>),
+    SelectFigure(BTreeSet<usize>),
+    UnselectFigureAll,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

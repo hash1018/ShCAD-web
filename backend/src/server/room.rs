@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -24,6 +24,8 @@ pub enum RoomMessage {
     AddFigure(FigureData),
     RequestInfo(Arc<str>, RequestType),
     NotifyMousePositionChanged(Arc<str>, VecDeque<(f64, f64)>),
+    SelectFigure(Arc<str>, BTreeSet<usize>),
+    UnselectFigureAll(Arc<str>),
 }
 
 pub struct Room {
@@ -31,6 +33,7 @@ pub struct Room {
     server_app_sender: Sender<ServerAppMessage>,
     users: Arc<Mutex<HashMap<Arc<str>, User>>>,
     figures: Arc<Mutex<BTreeMap<usize, FigureData>>>,
+    selected_figures: Arc<Mutex<BTreeMap<Arc<str>, BTreeSet<usize>>>>,
     sender: Sender<RoomMessage>, //Pass to new_user so that room's receiver can receive a message from user.
 }
 
@@ -43,6 +46,7 @@ impl Room {
             server_app_sender,
             users: Arc::new(Mutex::new(HashMap::new())),
             figures: Arc::new(Mutex::new(BTreeMap::new())),
+            selected_figures: Arc::new(Mutex::new(BTreeMap::new())),
             sender,
         };
 
@@ -56,6 +60,7 @@ impl Room {
         let users_clone = self.users.clone();
         let server_app_sender_clone = self.server_app_sender.clone();
         let figures_clone = self.figures.clone();
+        let selected_figures_clone = self.selected_figures.clone();
         let room_id = self.id.clone();
         tokio::spawn(async move {
             while let Some(message) = receiver.recv().await {
@@ -121,6 +126,33 @@ impl Room {
                                 user_id.to_string(),
                                 queue,
                             ),
+                        )
+                        .await;
+                    }
+                    RoomMessage::SelectFigure(user_id, mut ids) => {
+                        let mut selected_figures_lock = selected_figures_clone.lock().await;
+                        let backup = ids.clone();
+                        if let Some(item) = selected_figures_lock.get_mut(&user_id) {
+                            item.append(&mut ids);
+                        } else {
+                            selected_figures_lock.insert(user_id.clone(), ids);
+                        }
+
+                        let mut users_lock = users_clone.lock().await;
+                        broadcast(
+                            &mut users_lock,
+                            ServerMessage::FigureSelected(user_id.to_string(), backup),
+                        )
+                        .await;
+                    }
+                    RoomMessage::UnselectFigureAll(user_id) => {
+                        let mut selected_figures_lock = selected_figures_clone.lock().await;
+                        selected_figures_lock.remove(&user_id);
+
+                        let mut users_lock = users_clone.lock().await;
+                        broadcast(
+                            &mut users_lock,
+                            ServerMessage::FigureUnselectedAll(user_id.to_string()),
                         )
                         .await;
                     }

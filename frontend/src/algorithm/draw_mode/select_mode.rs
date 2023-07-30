@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 
 use crate::{
     algorithm::visitor::finder::Finder,
@@ -27,10 +27,16 @@ impl DrawMode for SelectMode {
 
         let finder = Finder::new((x, y), data.coordinates().zoom_rate, 6.0);
 
-        if let Some(id) = figure_maintainer.borrow_mut().search(&finder) {
-            log::info!("found id = {id}");
-        } else {
-            log::info!("not found");
+        let mut f_m_borrow_mut = figure_maintainer.borrow_mut();
+
+        if let Some(id) = f_m_borrow_mut.search(&finder) {
+            if !f_m_borrow_mut.check_selected(id) {
+                let mut ids = BTreeSet::new();
+                ids.insert(id);
+                return Some(ShouldAction::SelectFigure(ids));
+            }
+        } else if f_m_borrow_mut.selected_list_len() != 0 {
+            return Some(ShouldAction::UnselectFigureAll);
         }
 
         None

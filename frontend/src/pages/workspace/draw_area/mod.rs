@@ -15,7 +15,7 @@ use crate::{
     algorithm::{
         coordinates_converter::{convert_device_to_figure, convert_figure_to_webgl},
         draw_mode::{pan_mode::PanMode, select_mode::SelectMode, DrawMode},
-        visitor::drawer::{Drawer, DrawerGL},
+        visitor::drawer::DrawerGL,
     },
     base::{DrawModeType, DrawOption, ShouldAction},
 };
@@ -122,7 +122,10 @@ impl Component for DrawArea {
                     }
                     return true;
                 }
-                UpdateReason::FigureAdded | UpdateReason::GetCurrentFigures => {
+                UpdateReason::FigureAdded
+                | UpdateReason::GetCurrentFigures
+                | UpdateReason::FigureSelected
+                | UpdateReason::FigureUnselectedAll => {
                     self.draw_option = DrawOption::DrawAll;
                     return true;
                 }
@@ -263,6 +266,16 @@ impl Component for DrawArea {
                         .handler
                         .emit(ChildRequestType::NotifyMousePositionChanged(queue));
                 }
+                ShouldAction::SelectFigure(ids) => {
+                    ctx.props()
+                        .handler
+                        .emit(ChildRequestType::SelectFigure(ids));
+                }
+                ShouldAction::UnselectFigureAll => {
+                    ctx.props()
+                        .handler
+                        .emit(ChildRequestType::UnselectFigureAll);
+                }
             }
         }
         false
@@ -327,9 +340,13 @@ impl DrawArea {
                 canvas.client_height() as f64,
             );
 
-            let drawer = Drawer::new(&context, &coordinates);
+            figure_maintainer
+                .borrow_mut()
+                .draw_default(&context, &coordinates);
 
-            figure_maintainer.borrow_mut().draw_default(&drawer);
+            figure_maintainer
+                .borrow_mut()
+                .draw_selected(&context, &coordinates);
 
             let mut shared_users_borrow_mut = user_list.borrow_mut();
 

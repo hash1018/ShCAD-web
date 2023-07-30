@@ -85,6 +85,8 @@ async fn handle_message(
                     ClientMessage::NotifyMousePositionChanged(queue) => {
                         RoomMessage::NotifyMousePositionChanged(id.clone(), queue)
                     }
+                    ClientMessage::SelectFigure(ids) => RoomMessage::SelectFigure(id.clone(), ids),
+                    ClientMessage::UnselectFigureAll => RoomMessage::UnselectFigureAll(id.clone()),
                     _ => {
                         continue;
                     }

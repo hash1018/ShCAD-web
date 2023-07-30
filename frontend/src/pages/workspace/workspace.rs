@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     rc::Rc,
 };
 
@@ -37,6 +37,8 @@ pub enum ChildRequestType {
     ChangeMode(DrawModeType),
     AddFigure(Box<dyn Figure>),
     NotifyMousePositionChanged(VecDeque<(f64, f64)>),
+    SelectFigure(BTreeSet<usize>),
+    UnselectFigureAll,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -261,6 +263,22 @@ fn handle_server_message(
             workspace.shared_users.update_mouse_position(user_id, queue);
             Some(UpdateReason::MousePositionChanged)
         }
+        ServerMessage::FigureSelected(user_id, ids) => {
+            if user_id == user_name().unwrap() {
+                workspace.figure_maintainer.borrow_mut().select(ids);
+                Some(UpdateReason::FigureSelected)
+            } else {
+                None
+            }
+        }
+        ServerMessage::FigureUnselectedAll(user_id) => {
+            if user_id == user_name().unwrap() {
+                workspace.figure_maintainer.borrow_mut().unselect_all();
+                Some(UpdateReason::FigureUnselectedAll)
+            } else {
+                None
+            }
+        }
     };
 
     update_reason
@@ -284,6 +302,10 @@ fn handle_child_request(
         ChildRequestType::ChangeMode(mode) => {
             if mode != workspace.current_mode {
                 workspace.current_mode = mode;
+                //When change mode unselect all selected figures.
+                if let Some(wss) = workspace.wss.as_ref() {
+                    wss.send(lib::message::ClientMessage::UnselectFigureAll);
+                }
                 Some(UpdateReason::ChangeMode)
             } else {
                 None
@@ -301,6 +323,18 @@ fn handle_child_request(
                 wss.send(lib::message::ClientMessage::NotifyMousePositionChanged(
                     queue,
                 ));
+            }
+            None
+        }
+        ChildRequestType::SelectFigure(ids) => {
+            if let Some(wss) = workspace.wss.as_ref() {
+                wss.send(lib::message::ClientMessage::SelectFigure(ids));
+            }
+            None
+        }
+        ChildRequestType::UnselectFigureAll => {
+            if let Some(wss) = workspace.wss.as_ref() {
+                wss.send(lib::message::ClientMessage::UnselectFigureAll);
             }
             None
         }

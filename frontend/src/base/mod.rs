@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 
 use lib::figure::Figure;
 use strum_macros::EnumIter;
@@ -14,6 +14,8 @@ pub enum ShouldAction {
     BackToSelect,
     AddFigure(Box<dyn Figure>),
     NotifyMousePositionChanged(VecDeque<(f64, f64)>),
+    SelectFigure(BTreeSet<usize>),
+    UnselectFigureAll,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
