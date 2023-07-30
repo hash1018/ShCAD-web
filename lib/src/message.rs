@@ -32,6 +32,7 @@ pub enum RequestType {
     CheckRoomExist(RoomId),
     CheckUserExist(RoomId, UserId),
     CurrentSharedUsers,
+    CurrentSelectedFigures,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -41,6 +42,7 @@ pub enum ResponseType {
     ResponseRoomExist(bool),
     ResponseUserExist(Option<bool>),
     InvalidRequest(RequestType),
+    CurrentSelectedFigures(BTreeMap<String, BTreeSet<usize>>),
 }
 
 pub type RoomId = String;

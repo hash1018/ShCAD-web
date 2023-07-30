@@ -125,7 +125,8 @@ impl Component for DrawArea {
                 UpdateReason::FigureAdded
                 | UpdateReason::GetCurrentFigures
                 | UpdateReason::FigureSelected
-                | UpdateReason::FigureUnselectedAll => {
+                | UpdateReason::FigureUnselectedAll
+                | UpdateReason::GetCurrentSelectedFigures => {
                     self.draw_option = DrawOption::DrawAll;
                     return true;
                 }
@@ -326,7 +327,7 @@ impl DrawArea {
 
         let coordinates = self.data.coordinates().clone();
         let figure_maintainer = props.figure_maintainer.clone();
-        let user_list = props.shared_users.list();
+        let shared_users = props.shared_users.clone();
 
         let callback = Rc::new(RefCell::new(None));
         let animation_handle_clone = self.animation_handle.clone();
@@ -347,6 +348,12 @@ impl DrawArea {
             figure_maintainer
                 .borrow_mut()
                 .draw_selected(&context, &coordinates);
+
+            figure_maintainer
+                .borrow_mut()
+                .draw_selected_by_another_user(&context, &coordinates, shared_users.clone());
+
+            let user_list = shared_users.list();
 
             let mut shared_users_borrow_mut = user_list.borrow_mut();
 

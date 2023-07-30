@@ -66,19 +66,29 @@ impl Room {
             while let Some(message) = receiver.recv().await {
                 match message {
                     RoomMessage::LeaveUser(user_id) => {
-                        log::info!("LeaveUser user_id = {user_id}");
-                        let mut users_lock = users_clone.lock().await;
-                        users_lock.remove(&user_id);
-                        log::info!("now users = {0:?}", *users_lock);
-                        if users_lock.is_empty() {
-                            let _ = server_app_sender_clone
-                                .send(ServerAppMessage::DeleteRoom(room_id.clone()))
+                        {
+                            log::info!("LeaveUser user_id = {user_id}");
+                            let mut users_lock = users_clone.lock().await;
+                            users_lock.remove(&user_id);
+                            log::info!("now users = {0:?}", *users_lock);
+                            if users_lock.is_empty() {
+                                let _ = server_app_sender_clone
+                                    .send(ServerAppMessage::DeleteRoom(room_id.clone()))
+                                    .await;
+                                break;
+                            } else {
+                                broadcast(
+                                    &mut users_lock,
+                                    ServerMessage::UserLeft(user_id.to_string()),
+                                )
                                 .await;
-                            break;
-                        } else {
-                            broadcast(
-                                &mut users_lock,
-                                ServerMessage::UserLeft(user_id.to_string()),
+                            }
+                        }
+                        {
+                            unselect_all(
+                                user_id,
+                                selected_figures_clone.clone(),
+                                users_clone.clone(),
                             )
                             .await;
                         }
@@ -115,6 +125,22 @@ impl Room {
                                 .await;
                             }
                         }
+                        RequestType::CurrentSelectedFigures => {
+                            let mut users_lock = users_clone.lock().await;
+                            let selected_figures_lock = selected_figures_clone.lock().await;
+
+                            let mut map = BTreeMap::new();
+                            for (id, ids) in selected_figures_lock.iter() {
+                                map.insert(id.to_string(), ids.clone());
+                            }
+
+                            if let Some(user) = users_lock.get_mut(&user_id) {
+                                user.send_message(ServerMessage::ResponseInfo(
+                                    ResponseType::CurrentSelectedFigures(map),
+                                ))
+                                .await;
+                            }
+                        }
                         _ => {}
                     },
                     RoomMessage::NotifyMousePositionChanged(user_id, queue) => {
@@ -146,15 +172,8 @@ impl Room {
                         .await;
                     }
                     RoomMessage::UnselectFigureAll(user_id) => {
-                        let mut selected_figures_lock = selected_figures_clone.lock().await;
-                        selected_figures_lock.remove(&user_id);
-
-                        let mut users_lock = users_clone.lock().await;
-                        broadcast(
-                            &mut users_lock,
-                            ServerMessage::FigureUnselectedAll(user_id.to_string()),
-                        )
-                        .await;
+                        unselect_all(user_id, selected_figures_clone.clone(), users_clone.clone())
+                            .await;
                     }
                 }
             }
@@ -199,4 +218,20 @@ async fn broadcast_except_for(
             user.send_message(message.clone()).await;
         }
     }
+}
+
+async fn unselect_all(
+    user_id: Arc<str>,
+    selected_figures: Arc<Mutex<BTreeMap<Arc<str>, BTreeSet<usize>>>>,
+    users: Arc<Mutex<HashMap<Arc<str>, User>>>,
+) {
+    let mut selected_figures_lock = selected_figures.lock().await;
+    selected_figures_lock.remove(&user_id);
+
+    let mut users_lock = users.lock().await;
+    broadcast(
+        &mut users_lock,
+        ServerMessage::FigureUnselectedAll(user_id.to_string()),
+    )
+    .await;
 }

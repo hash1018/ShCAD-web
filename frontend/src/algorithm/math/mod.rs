@@ -133,3 +133,28 @@ pub fn check_point_lies_on_line(
 
     false
 }
+/// Caculate rectangle point with two points.
+/// # Arguments
+///
+/// # Returns
+///
+///  first: top left x,y
+///
+///  second: width
+///
+///  third: height
+pub fn caculate_rectangle(first: (f64, f64), second: (f64, f64)) -> ((f64, f64), f64, f64) {
+    let (left_x, right_x) = if compare(first.0, second.0, EPSILON) == 1 {
+        (second.0, first.0)
+    } else {
+        (first.0, second.0)
+    };
+
+    let (top_y, bottom_y) = if compare(first.1, second.1, EPSILON) == 1 {
+        (second.1, first.1)
+    } else {
+        (first.1, second.1)
+    };
+
+    ((left_x, top_y), right_x - left_x, bottom_y - top_y)
+}

@@ -4,7 +4,10 @@ use lib::{
 };
 use web_sys::{CanvasRenderingContext2d, WebGlProgram, WebGlRenderingContext};
 
-use crate::{algorithm::coordinates_converter::convert_figure_to_device, Coordinates};
+use crate::{
+    algorithm::{coordinates_converter::convert_figure_to_device, math::caculate_rectangle},
+    Coordinates,
+};
 
 pub struct Drawer<'a> {
     context: &'a CanvasRenderingContext2d,
@@ -94,6 +97,36 @@ impl Visitor for SelectedDrawer<'_> {
     }
 }
 
+pub struct SelectedByAnotherUserDrawer<'a> {
+    context: &'a CanvasRenderingContext2d,
+    coordinates: &'a Coordinates,
+    color: Color,
+}
+
+impl<'a> SelectedByAnotherUserDrawer<'a> {
+    pub fn new(
+        context: &'a CanvasRenderingContext2d,
+        coordinates: &'a Coordinates,
+        color: Color,
+    ) -> Self {
+        Self {
+            context,
+            coordinates,
+            color,
+        }
+    }
+}
+
+impl Visitor for SelectedByAnotherUserDrawer<'_> {
+    fn visit_line(&self, line: &mut Line) {
+        let start = convert_figure_to_device(self.coordinates, line.start_x(), line.start_y());
+        let end = convert_figure_to_device(self.coordinates, line.end_x(), line.end_y());
+
+        let (top_left, width, height) = caculate_rectangle(start, end);
+        draw_rectangle(top_left, width, height, &self.color, self.context);
+    }
+}
+
 fn draw_line(
     start: (f64, f64),
     end: (f64, f64),
@@ -101,7 +134,7 @@ fn draw_line(
     context: &CanvasRenderingContext2d,
 ) {
     let color_text = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
-    context.set_fill_style(&color_text.into());
+    context.set_stroke_style(&color_text.into());
 
     context.begin_path();
     context.move_to(start.0, start.1);
@@ -117,4 +150,19 @@ fn fill_circle(center: (f64, f64), radius: f64, color: &Color, context: &CanvasR
     context.arc(center.0, center.1, radius, 0.0, 360.0).unwrap();
     context.close_path();
     context.fill();
+}
+
+fn draw_rectangle(
+    top_left: (f64, f64),
+    width: f64,
+    height: f64,
+    color: &Color,
+    context: &CanvasRenderingContext2d,
+) {
+    let color_text = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
+    context.set_stroke_style(&color_text.into());
+    context.begin_path();
+    context.rect(top_left.0, top_left.1, width, height);
+    context.close_path();
+    context.stroke();
 }

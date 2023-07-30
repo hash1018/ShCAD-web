@@ -11,7 +11,7 @@ use crate::{
     algorithm::{
         coordinates_converter::convert_figure_to_device,
         visitor::{
-            drawer::{Drawer, SelectedDrawer},
+            drawer::{Drawer, SelectedByAnotherUserDrawer, SelectedDrawer},
             finder::Finder,
         },
     },
@@ -22,6 +22,7 @@ use crate::{
 pub struct FigureMaintainer {
     default_list: BTreeMap<usize, Box<dyn Figure>>,
     selected_list: BTreeSet<usize>,
+    selected_list_by_another_user: BTreeMap<String, BTreeSet<usize>>,
     preview: Option<Box<dyn Figure>>,
 }
 
@@ -36,6 +37,7 @@ impl FigureMaintainer {
         FigureMaintainer {
             default_list: BTreeMap::new(),
             selected_list: BTreeSet::new(),
+            selected_list_by_another_user: BTreeMap::new(),
             preview: None,
         }
     }
@@ -83,6 +85,27 @@ impl FigureMaintainer {
         }
     }
 
+    pub fn draw_selected_by_another_user(
+        &mut self,
+        context: &CanvasRenderingContext2d,
+        coordinates: &Coordinates,
+        shared_users: Rc<SharedUsers>,
+    ) {
+        for (user_id, ids) in self.selected_list_by_another_user.iter() {
+            let color = shared_users.personal_color(user_id);
+            if let Some(color) = color {
+                let drawer: SelectedByAnotherUserDrawer<'_> =
+                    SelectedByAnotherUserDrawer::new(context, coordinates, color);
+
+                for id in ids.iter() {
+                    if let Some(figure) = self.default_list.get_mut(id) {
+                        figure.accept(&drawer);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn search(&mut self, finder: &Finder) -> Option<usize> {
         for (id, figure) in self.default_list.iter_mut() {
             figure.accept(finder);
@@ -104,8 +127,20 @@ impl FigureMaintainer {
         }
     }
 
+    pub fn select_by_another_user(&mut self, user_id: String, mut ids: BTreeSet<usize>) {
+        if let Some(set) = self.selected_list_by_another_user.get_mut(&user_id) {
+            set.append(&mut ids);
+        } else {
+            self.selected_list_by_another_user.insert(user_id, ids);
+        }
+    }
+
     pub fn unselect_all(&mut self) {
         self.selected_list.clear();
+    }
+
+    pub fn unselect_all_by_another_user(&mut self, user_id: String) {
+        self.selected_list_by_another_user.remove(&user_id);
     }
 
     pub fn selected_list_len(&self) -> usize {
@@ -183,8 +218,9 @@ impl SharedUsers {
             .position(|user| user.user_id == user_id);
         if let Some(position) = position {
             let mut list_borrow_mut = self.list.borrow_mut();
-            let user = list_borrow_mut.get_mut(position).unwrap();
-            user.set_mouse_position_queue(mouse_position);
+            if let Some(user) = list_borrow_mut.get_mut(position) {
+                user.set_mouse_position_queue(mouse_position);
+            }
         }
     }
 
@@ -192,6 +228,21 @@ impl SharedUsers {
         for user in self.list.borrow_mut().iter_mut() {
             user.clear_mouse_position_queue();
         }
+    }
+
+    pub fn personal_color(&self, user_id: &str) -> Option<Color> {
+        let position = self
+            .list
+            .borrow()
+            .iter()
+            .position(|user| user.user_id == user_id);
+        if let Some(position) = position {
+            let list = self.list.borrow();
+            if let Some(user) = list.get(position) {
+                return user.color;
+            }
+        }
+        None
     }
 }
 

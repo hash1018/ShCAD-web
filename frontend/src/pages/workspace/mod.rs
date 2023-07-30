@@ -12,6 +12,7 @@ pub enum UpdateReason {
     FigureAdded,
     GetCurrentFigures,
     GetCurrentSharedUsers,
+    GetCurrentSelectedFigures,
     UserJoined,
     UserLeft,
     ShowChat,

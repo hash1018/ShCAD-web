@@ -235,17 +235,37 @@ fn handle_server_message(
                     None
                 }
             }
+            lib::message::ResponseType::CurrentSelectedFigures(tree) => {
+                if tree.is_empty() {
+                    None
+                } else {
+                    let me = user_name().unwrap();
+                    for (id, map) in tree {
+                        if id != me {
+                            workspace
+                                .figure_maintainer
+                                .borrow_mut()
+                                .select_by_another_user(id, map);
+                        }
+                    }
+                    Some(UpdateReason::GetCurrentSelectedFigures)
+                }
+            }
             _ => None,
         },
         ServerMessage::UserJoined(user_id) => {
             if user_id == user_name().unwrap() {
                 if let Some(wss) = workspace.wss.as_ref() {
                     wss.send(lib::message::ClientMessage::RequestInfo(
+                        lib::message::RequestType::CurrentSharedUsers,
+                    ));
+
+                    wss.send(lib::message::ClientMessage::RequestInfo(
                         lib::message::RequestType::CurrentFigures,
                     ));
 
                     wss.send(lib::message::ClientMessage::RequestInfo(
-                        lib::message::RequestType::CurrentSharedUsers,
+                        lib::message::RequestType::CurrentSelectedFigures,
                     ));
                 }
                 None
@@ -266,18 +286,24 @@ fn handle_server_message(
         ServerMessage::FigureSelected(user_id, ids) => {
             if user_id == user_name().unwrap() {
                 workspace.figure_maintainer.borrow_mut().select(ids);
-                Some(UpdateReason::FigureSelected)
             } else {
-                None
+                workspace
+                    .figure_maintainer
+                    .borrow_mut()
+                    .select_by_another_user(user_id, ids);
             }
+            Some(UpdateReason::FigureSelected)
         }
         ServerMessage::FigureUnselectedAll(user_id) => {
             if user_id == user_name().unwrap() {
                 workspace.figure_maintainer.borrow_mut().unselect_all();
-                Some(UpdateReason::FigureUnselectedAll)
             } else {
-                None
+                workspace
+                    .figure_maintainer
+                    .borrow_mut()
+                    .unselect_all_by_another_user(user_id);
             }
+            Some(UpdateReason::FigureUnselectedAll)
         }
     };
 
