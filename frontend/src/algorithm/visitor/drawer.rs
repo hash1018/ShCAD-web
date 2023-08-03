@@ -75,14 +75,44 @@ impl Visitor for DrawerGL<'_> {
 pub struct SelectedDrawer<'a> {
     context: &'a CanvasRenderingContext2d,
     coordinates: &'a Coordinates,
+    single_mode: bool,
 }
 
 impl<'a> SelectedDrawer<'a> {
-    pub fn new(context: &'a CanvasRenderingContext2d, coordinates: &'a Coordinates) -> Self {
+    pub fn new(
+        context: &'a CanvasRenderingContext2d,
+        coordinates: &'a Coordinates,
+        single_mode: bool,
+    ) -> Self {
         Self {
             context,
             coordinates,
+            single_mode,
         }
+    }
+
+    pub fn draw_total_selected_rect(
+        &self,
+        figure_top_left: (f64, f64),
+        figure_width: f64,
+        figure_height: f64,
+    ) {
+        let color = Color::new(0, 0, 153, 255);
+        let top_left =
+            convert_figure_to_device(self.coordinates, figure_top_left.0, figure_top_left.1);
+        let bottom_right = convert_figure_to_device(
+            self.coordinates,
+            figure_top_left.0 + figure_width,
+            figure_top_left.1 - figure_height,
+        );
+
+        draw_rectangle(
+            top_left,
+            bottom_right.0 - top_left.0,
+            bottom_right.1 - top_left.1,
+            &color,
+            self.context,
+        );
     }
 }
 
@@ -92,8 +122,14 @@ impl Visitor for SelectedDrawer<'_> {
         let end = convert_figure_to_device(self.coordinates, line.end_x(), line.end_y());
 
         let color = Color::new(135, 206, 235, 255);
-        fill_circle(start, 6.0, &color, self.context);
-        fill_circle(end, 6.0, &color, self.context);
+
+        if self.single_mode {
+            fill_circle(start, 6.0, &color, self.context);
+            fill_circle(end, 6.0, &color, self.context);
+        } else {
+            let (top_left, width, height) = caculate_rectangle(start, end, true);
+            draw_rectangle(top_left, width, height, &color, self.context);
+        }
     }
 }
 
@@ -122,7 +158,7 @@ impl Visitor for SelectedByAnotherUserDrawer<'_> {
         let start = convert_figure_to_device(self.coordinates, line.start_x(), line.start_y());
         let end = convert_figure_to_device(self.coordinates, line.end_x(), line.end_y());
 
-        let (top_left, width, height) = caculate_rectangle(start, end);
+        let (top_left, width, height) = caculate_rectangle(start, end, true);
         draw_rectangle(top_left, width, height, &self.color, self.context);
     }
 }

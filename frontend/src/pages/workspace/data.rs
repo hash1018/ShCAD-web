@@ -13,6 +13,7 @@ use crate::{
         visitor::{
             drawer::{Drawer, SelectedByAnotherUserDrawer, SelectedDrawer},
             finder::Finder,
+            rect_pos_getter::RectPosGetter,
         },
     },
     Coordinates,
@@ -76,11 +77,25 @@ impl FigureMaintainer {
     }
 
     pub fn draw_selected(&mut self, context: &CanvasRenderingContext2d, coordinates: &Coordinates) {
-        let drawer: SelectedDrawer<'_> = SelectedDrawer::new(context, coordinates);
+        let len = self.selected_list.len();
+        let drawer: SelectedDrawer<'_> = SelectedDrawer::new(context, coordinates, len == 1);
+        let rect_pos_getter = RectPosGetter::new();
 
         for id in self.selected_list.iter() {
             if let Some(figure) = self.default_list.get_mut(id) {
                 figure.accept(&drawer);
+                figure.accept(&rect_pos_getter);
+            }
+        }
+
+        if len >= 2 {
+            if let (Some(top_y), Some(left_x), Some(width), Some(height)) = (
+                rect_pos_getter.top_y(),
+                rect_pos_getter.left_x(),
+                rect_pos_getter.width(),
+                rect_pos_getter.height(),
+            ) {
+                drawer.draw_total_selected_rect((left_x, top_y), width, height);
             }
         }
     }

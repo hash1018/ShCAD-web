@@ -143,7 +143,11 @@ pub fn check_point_lies_on_line(
 ///  second: width
 ///
 ///  third: height
-pub fn caculate_rectangle(first: (f64, f64), second: (f64, f64)) -> ((f64, f64), f64, f64) {
+pub fn caculate_rectangle(
+    first: (f64, f64),
+    second: (f64, f64),
+    y_axis_increase_downward: bool,
+) -> ((f64, f64), f64, f64) {
     let (left_x, right_x) = if compare(first.0, second.0, EPSILON) == 1 {
         (second.0, first.0)
     } else {
@@ -151,10 +155,20 @@ pub fn caculate_rectangle(first: (f64, f64), second: (f64, f64)) -> ((f64, f64),
     };
 
     let (top_y, bottom_y) = if compare(first.1, second.1, EPSILON) == 1 {
-        (second.1, first.1)
-    } else {
+        if y_axis_increase_downward {
+            (second.1, first.1)
+        } else {
+            (first.1, second.1)
+        }
+    } else if y_axis_increase_downward {
         (first.1, second.1)
+    } else {
+        (second.1, first.1)
     };
 
-    ((left_x, top_y), right_x - left_x, bottom_y - top_y)
+    if y_axis_increase_downward {
+        ((left_x, top_y), right_x - left_x, bottom_y - top_y)
+    } else {
+        ((left_x, top_y), right_x - left_x, top_y - bottom_y)
+    }
 }
