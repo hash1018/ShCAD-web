@@ -21,18 +21,18 @@ pub trait DrawMode {
         event: MouseEvent,
         data: &mut DrawAreaData,
         figures: Rc<RefCell<FigureMaintainer>>,
-    ) -> Option<ShouldAction>;
+    ) -> Option<Vec<ShouldAction>>;
     fn mouse_mouse_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
         figures: Rc<RefCell<FigureMaintainer>>,
-    ) -> Option<ShouldAction>;
+    ) -> Option<Vec<ShouldAction>>;
     fn mouse_release_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
-    ) -> Option<ShouldAction>;
+    ) -> Option<Vec<ShouldAction>>;
     fn get_type(&self) -> DrawModeType;
 
     fn convert_figure_coordinates(&self, event: &MouseEvent, data: &DrawAreaData) -> (f64, f64) {

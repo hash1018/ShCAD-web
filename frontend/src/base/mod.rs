@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, VecDeque};
 
-use lib::figure::Figure;
+use lib::{common::Color, figure::Figure};
 use strum_macros::EnumIter;
 
 #[derive(PartialEq, Copy, Clone, Debug, EnumIter)]
@@ -23,3 +23,16 @@ pub enum DrawOption {
     Remain,
     DrawAll,
 }
+
+pub const SELECTED_FIGURE_COLOR: Color = Color {
+    r: 135,
+    g: 206,
+    b: 235,
+    a: 255,
+};
+pub const TOTAL_SELECTED_FIGURE_COLOR_RECT: Color = Color {
+    r: 30,
+    g: 144,
+    b: 255,
+    a: 255,
+};

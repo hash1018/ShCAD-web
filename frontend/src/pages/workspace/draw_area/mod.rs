@@ -165,7 +165,7 @@ impl Component for DrawArea {
     }
 
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
-        let should_action = match msg {
+        let should_actions = match msg {
             DrawAreaMessage::MouseDown(event) => match event.button() {
                 0 => self.current_mode.mouse_left_press_event(
                     event,
@@ -204,14 +204,14 @@ impl Component for DrawArea {
                 if self.pan_mode.take().is_none() {
                     self.current_mode.mouse_release_event(event, &mut self.data)
                 } else {
-                    Some(ShouldAction::Rerender(DrawOption::Remain))
+                    Some(vec![ShouldAction::Rerender(DrawOption::Remain)])
                 }
             }
             DrawAreaMessage::KeyDown(event) => {
                 //Esc key down.
                 if event.key_code() == 27 {
                     if self.current_mode.get_type() != DrawModeType::SelectMode {
-                        Some(ShouldAction::BackToSelect)
+                        Some(vec![ShouldAction::BackToSelect])
                     } else {
                         None
                     }
@@ -230,52 +230,54 @@ impl Component for DrawArea {
                     self.data
                         .append_scroll_pos(event.delta_x(), event.delta_y());
 
-                    Some(ShouldAction::Rerender(DrawOption::DrawAll))
+                    Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)])
                 }
             }
             DrawAreaMessage::MousePositionChanged(queue) => {
-                Some(ShouldAction::NotifyMousePositionChanged(queue))
+                Some(vec![ShouldAction::NotifyMousePositionChanged(queue)])
             }
             DrawAreaMessage::VisibilityChange(visible) => {
                 if visible {
                     ctx.props().shared_users.clear_mouse_position_queue();
-                    Some(ShouldAction::Rerender(DrawOption::DrawAll))
+                    Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)])
                 } else {
                     None
                 }
             }
         };
 
-        if let Some(should_action) = should_action {
-            match should_action {
-                ShouldAction::BackToSelect => {
-                    ctx.props()
-                        .handler
-                        .emit(ChildRequestType::ChangeMode(DrawModeType::SelectMode));
-                }
-                ShouldAction::Rerender(draw_option) => {
-                    self.draw_option = draw_option;
-                    return true;
-                }
-                ShouldAction::AddFigure(figure) => {
-                    ctx.props()
-                        .handler
-                        .emit(ChildRequestType::AddFigure(figure));
-                }
-                ShouldAction::NotifyMousePositionChanged(queue) => {
-                    ctx.props()
-                        .handler
-                        .emit(ChildRequestType::NotifyMousePositionChanged(queue));
-                }
-                ShouldAction::SelectFigure(ids) => {
-                    ctx.props()
-                        .handler
-                        .emit(ChildRequestType::SelectFigure(ids));
-                }
-                ShouldAction::UnselectFigureAll => {
-                    ctx.props()
-                        .handler
-                        .emit(ChildRequestType::UnselectFigureAll);
+        if let Some(should_actions) = should_actions {
+            for should_action in should_actions {
+                match should_action {
+                    ShouldAction::BackToSelect => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::ChangeMode(DrawModeType::SelectMode));
+                    }
+                    ShouldAction::Rerender(draw_option) => {
+                        self.draw_option = draw_option;
+                        return true;
+                    }
+                    ShouldAction::AddFigure(figure) => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::AddFigure(figure));
+                    }
+                    ShouldAction::NotifyMousePositionChanged(queue) => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::NotifyMousePositionChanged(queue));
+                    }
+                    ShouldAction::SelectFigure(ids) => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::SelectFigure(ids));
+                    }
+                    ShouldAction::UnselectFigureAll => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::UnselectFigureAll);
+                    }
                 }
             }
         }

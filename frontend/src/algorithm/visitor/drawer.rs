@@ -6,6 +6,7 @@ use web_sys::{CanvasRenderingContext2d, WebGlProgram, WebGlRenderingContext};
 
 use crate::{
     algorithm::{coordinates_converter::convert_figure_to_device, math::caculate_rectangle},
+    base::{SELECTED_FIGURE_COLOR, TOTAL_SELECTED_FIGURE_COLOR_RECT},
     Coordinates,
 };
 
@@ -97,7 +98,7 @@ impl<'a> SelectedDrawer<'a> {
         figure_width: f64,
         figure_height: f64,
     ) {
-        let color = Color::new(0, 0, 153, 255);
+        let color = TOTAL_SELECTED_FIGURE_COLOR_RECT;
         let top_left =
             convert_figure_to_device(self.coordinates, figure_top_left.0, figure_top_left.1);
         let bottom_right = convert_figure_to_device(
@@ -121,7 +122,7 @@ impl Visitor for SelectedDrawer<'_> {
         let start = convert_figure_to_device(self.coordinates, line.start_x(), line.start_y());
         let end = convert_figure_to_device(self.coordinates, line.end_x(), line.end_y());
 
-        let color = Color::new(135, 206, 235, 255);
+        let color = SELECTED_FIGURE_COLOR;
 
         if self.single_mode {
             fill_circle(start, 6.0, &color, self.context);

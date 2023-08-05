@@ -22,17 +22,19 @@ impl PanMode {
         &mut self,
         event: web_sys::MouseEvent,
         _data: &mut DrawAreaData,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         self.prev_x = event.offset_x() as f64;
         self.prev_y = event.offset_y() as f64;
-        Some(ShouldAction::Rerender(DrawOption::Remain))
+
+        let actions = vec![ShouldAction::Rerender(DrawOption::Remain)];
+        Some(actions)
     }
 
     pub fn mouse_mouse_event(
         &mut self,
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         let x = event.offset_x() as f64;
         let y = event.offset_y() as f64;
 
@@ -45,6 +47,8 @@ impl PanMode {
         self.prev_x = x;
         self.prev_y = y;
 
-        Some(ShouldAction::Rerender(DrawOption::DrawAll))
+        let actions = vec![ShouldAction::Rerender(DrawOption::DrawAll)];
+
+        Some(actions)
     }
 }

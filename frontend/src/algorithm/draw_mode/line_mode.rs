@@ -33,13 +33,13 @@ impl DrawMode for LineMode {
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
         figure_maintainer: Rc<RefCell<FigureMaintainer>>,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         let (x, y) = self.convert_figure_coordinates(&event, data);
 
         if let (Some(_), Some(_)) = (self.start_x.take(), self.start_y.take()) {
             if let Some(preview) = figure_maintainer.borrow_mut().take_preview() {
                 let preview = set_end_point_to_preview(preview, x, y);
-                return Some(ShouldAction::AddFigure(preview));
+                return Some(vec![ShouldAction::AddFigure(preview)]);
             }
         } else {
             self.start_x = Some(x);
@@ -57,14 +57,14 @@ impl DrawMode for LineMode {
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
         figure_maintainer: Rc<RefCell<FigureMaintainer>>,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         if self.start_x.is_some() && self.start_y.is_some() {
             let preview = figure_maintainer.borrow_mut().take_preview();
             if let Some(preview) = preview {
                 let (x, y) = self.convert_figure_coordinates(&event, data);
                 let preview = set_end_point_to_preview(preview, x, y);
                 figure_maintainer.borrow_mut().set_preview(Some(preview));
-                return Some(ShouldAction::Rerender(DrawOption::DrawAll));
+                return Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)]);
             }
         }
         None
@@ -74,7 +74,7 @@ impl DrawMode for LineMode {
         &mut self,
         _event: web_sys::MouseEvent,
         _data: &mut DrawAreaData,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         None
     }
 

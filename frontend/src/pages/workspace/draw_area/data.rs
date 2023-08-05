@@ -67,7 +67,7 @@ impl DrawAreaData {
         self.coordinates.scroll_v_pos += v_pos;
     }
 
-    pub fn zoom_in(&mut self, event: WheelEvent) -> Option<ShouldAction> {
+    pub fn zoom_in(&mut self, event: WheelEvent) -> Option<Vec<ShouldAction>> {
         let device_x = event.offset_x() as f64;
         let device_y = event.offset_y() as f64;
         let (x, y) = convert_device_to_figure(self.coordinates(), device_x, device_y);
@@ -91,10 +91,10 @@ impl DrawAreaData {
         self.coordinates.scroll_h_pos = self.coordinates.zoom_rate * x - device_x
             + (self.coordinates.center_x * self.coordinates.zoom_rate);
 
-        Some(ShouldAction::Rerender(DrawOption::DrawAll))
+        Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)])
     }
 
-    pub fn zoom_out(&mut self, event: WheelEvent) -> Option<ShouldAction> {
+    pub fn zoom_out(&mut self, event: WheelEvent) -> Option<Vec<ShouldAction>> {
         let device_x = event.offset_x() as f64;
         let device_y = event.offset_y() as f64;
         let (x, y) = convert_device_to_figure(self.coordinates(), device_x, device_y);
@@ -118,7 +118,7 @@ impl DrawAreaData {
         self.coordinates.scroll_h_pos = self.coordinates.zoom_rate * x - device_x
             + (self.coordinates.center_x * self.coordinates.zoom_rate);
 
-        Some(ShouldAction::Rerender(DrawOption::DrawAll))
+        Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)])
     }
 }
 

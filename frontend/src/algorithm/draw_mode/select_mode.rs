@@ -22,7 +22,7 @@ impl DrawMode for SelectMode {
         event: web_sys::MouseEvent,
         data: &mut DrawAreaData,
         figure_maintainer: Rc<RefCell<FigureMaintainer>>,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         let (x, y) = self.convert_figure_coordinates(&event, data);
 
         let finder = Finder::new((x, y), data.coordinates().zoom_rate, 6.0);
@@ -33,10 +33,10 @@ impl DrawMode for SelectMode {
             if !f_m_borrow_mut.check_selected(id) {
                 let mut ids = BTreeSet::new();
                 ids.insert(id);
-                return Some(ShouldAction::SelectFigure(ids));
+                return Some(vec![ShouldAction::SelectFigure(ids)]);
             }
         } else if f_m_borrow_mut.selected_list_len() != 0 {
-            return Some(ShouldAction::UnselectFigureAll);
+            return Some(vec![ShouldAction::UnselectFigureAll]);
         }
 
         None
@@ -47,7 +47,7 @@ impl DrawMode for SelectMode {
         _event: web_sys::MouseEvent,
         _data: &mut DrawAreaData,
         _figures: Rc<RefCell<FigureMaintainer>>,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         None
     }
 
@@ -55,7 +55,7 @@ impl DrawMode for SelectMode {
         &mut self,
         _event: web_sys::MouseEvent,
         _data: &mut DrawAreaData,
-    ) -> Option<ShouldAction> {
+    ) -> Option<Vec<ShouldAction>> {
         None
     }
 
