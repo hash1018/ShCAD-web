@@ -20,4 +20,6 @@ pub enum UpdateReason {
     MousePositionChanged,
     FigureSelected,
     FigureUnselectedAll,
+    SelectDragFinished,
+    GetCurrentSelectDragPositions,
 }

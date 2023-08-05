@@ -178,10 +178,17 @@ impl SubSelectMode for SubSelectDefaultMode {
                 actions = Some(vec![ShouldAction::SelectFigure(ids)]);
             }
         } else {
+            let mut actions_tmp = Vec::new();
+
             if f_m_borrow_mut.selected_list_len() != 0 {
-                actions = Some(vec![ShouldAction::UnselectFigureAll]);
+                actions_tmp.push(ShouldAction::UnselectFigureAll);
             }
+
+            actions_tmp.push(ShouldAction::NotifySelectDragStart(x, y));
+
             change_sub_mode = Some(ChangeSubMode::DragSelect);
+
+            actions = Some(actions_tmp);
         }
 
         (actions, change_sub_mode)
@@ -272,7 +279,10 @@ impl SubSelectMode for SubSelectDragMode {
         _data: &mut DrawAreaData,
     ) -> (Option<Vec<ShouldAction>>, Option<ChangeSubMode>) {
         (
-            Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)]),
+            Some(vec![
+                ShouldAction::Rerender(DrawOption::DrawAll),
+                ShouldAction::NotifySelectDragFinish,
+            ]),
             Some(ChangeSubMode::Default),
         )
     }

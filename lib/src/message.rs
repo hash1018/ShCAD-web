@@ -13,6 +13,8 @@ pub enum ServerMessage {
     NotifyUserMousePositionChanged(UserId, VecDeque<(f64, f64)>),
     FigureSelected(UserId, BTreeSet<usize>),
     FigureUnselectedAll(UserId),
+    NotifySelectDragStarted(UserId, f64, f64),
+    NotifySelectDragFinished(UserId),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -24,6 +26,8 @@ pub enum ClientMessage {
     NotifyMousePositionChanged(VecDeque<(f64, f64)>),
     SelectFigure(BTreeSet<usize>),
     UnselectFigureAll,
+    NotifySelectDragStart(f64, f64),
+    NotifySelectDragFinish,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -33,6 +37,7 @@ pub enum RequestType {
     CheckUserExist(RoomId, UserId),
     CurrentSharedUsers,
     CurrentSelectedFigures,
+    CurrentSelectDragPositions,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -43,6 +48,7 @@ pub enum ResponseType {
     ResponseUserExist(Option<bool>),
     InvalidRequest(RequestType),
     CurrentSelectedFigures(BTreeMap<String, BTreeSet<usize>>),
+    CurrentSelectDragPositions(BTreeMap<String, (f64, f64)>),
 }
 
 pub type RoomId = String;

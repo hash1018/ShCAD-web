@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::{BTreeSet, VecDeque};
 
 use lib::{common::Color, figure::Figure};
@@ -16,6 +17,42 @@ pub enum ShouldAction {
     NotifyMousePositionChanged(VecDeque<(f64, f64)>),
     SelectFigure(BTreeSet<usize>),
     UnselectFigureAll,
+    NotifySelectDragStart(f64, f64),
+    NotifySelectDragFinish,
+}
+
+impl fmt::Debug for ShouldAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Rerender(draw_option) => {
+                write!(f, "ShouldAction::Rerender draw_option: {draw_option:?}")
+            }
+            Self::BackToSelect => {
+                write!(f, "ShouldAction::BackToSelect")
+            }
+            Self::AddFigure(_) => {
+                write!(f, "ShouldAction::AddFigure")
+            }
+            Self::NotifyMousePositionChanged(queue) => {
+                write!(
+                    f,
+                    "ShouldAction::NotifyMousePositionChanged queue: {queue:?}"
+                )
+            }
+            Self::SelectFigure(set) => {
+                write!(f, "ShouldAction::SelectFigure set: {set:?}")
+            }
+            Self::UnselectFigureAll => {
+                write!(f, "ShouldAction::UnselectFigureAll")
+            }
+            Self::NotifySelectDragStart(x, y) => {
+                write!(f, "ShouldAction::NotifySelectDragStart x: {x}, y: {y}")
+            }
+            Self::NotifySelectDragFinish => {
+                write!(f, "ShouldAction::NotifySelectDragFinish")
+            }
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]

@@ -87,6 +87,12 @@ async fn handle_message(
                     }
                     ClientMessage::SelectFigure(ids) => RoomMessage::SelectFigure(id.clone(), ids),
                     ClientMessage::UnselectFigureAll => RoomMessage::UnselectFigureAll(id.clone()),
+                    ClientMessage::NotifySelectDragStart(x, y) => {
+                        RoomMessage::NotifySelectDragStart(id.clone(), x, y)
+                    }
+                    ClientMessage::NotifySelectDragFinish => {
+                        RoomMessage::NotifySelectDragFinish(id.clone())
+                    }
                     _ => {
                         continue;
                     }

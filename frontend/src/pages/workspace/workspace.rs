@@ -39,6 +39,8 @@ pub enum ChildRequestType {
     NotifyMousePositionChanged(VecDeque<(f64, f64)>),
     SelectFigure(BTreeSet<usize>),
     UnselectFigureAll,
+    NotifySelectDragStart(f64, f64),
+    NotifySelectDragFinish,
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -251,6 +253,21 @@ fn handle_server_message(
                     Some(UpdateReason::GetCurrentSelectedFigures)
                 }
             }
+            lib::message::ResponseType::CurrentSelectDragPositions(tree) => {
+                if tree.is_empty() {
+                    None
+                } else {
+                    let me = user_name().unwrap();
+                    for (id, position) in tree {
+                        if id != me {
+                            workspace
+                                .shared_users
+                                .set_select_drag_position(id, Some(position));
+                        }
+                    }
+                    Some(UpdateReason::GetCurrentSelectDragPositions)
+                }
+            }
             _ => None,
         },
         ServerMessage::UserJoined(user_id) => {
@@ -266,6 +283,10 @@ fn handle_server_message(
 
                     wss.send(lib::message::ClientMessage::RequestInfo(
                         lib::message::RequestType::CurrentSelectedFigures,
+                    ));
+
+                    wss.send(lib::message::ClientMessage::RequestInfo(
+                        lib::message::RequestType::CurrentSelectDragPositions,
                     ));
                 }
                 None
@@ -304,6 +325,24 @@ fn handle_server_message(
                     .unselect_all_by_another_user(user_id);
             }
             Some(UpdateReason::FigureUnselectedAll)
+        }
+        ServerMessage::NotifySelectDragStarted(user_id, x, y) => {
+            if user_id != user_name().unwrap() {
+                workspace
+                    .shared_users
+                    .set_select_drag_position(user_id, Some((x, y)));
+            }
+            None
+        }
+        ServerMessage::NotifySelectDragFinished(user_id) => {
+            if user_id != user_name().unwrap() {
+                workspace
+                    .shared_users
+                    .set_select_drag_position(user_id, None);
+                Some(UpdateReason::SelectDragFinished)
+            } else {
+                None
+            }
         }
     };
 
@@ -361,6 +400,18 @@ fn handle_child_request(
         ChildRequestType::UnselectFigureAll => {
             if let Some(wss) = workspace.wss.as_ref() {
                 wss.send(lib::message::ClientMessage::UnselectFigureAll);
+            }
+            None
+        }
+        ChildRequestType::NotifySelectDragStart(x, y) => {
+            if let Some(wss) = workspace.wss.as_ref() {
+                wss.send(lib::message::ClientMessage::NotifySelectDragStart(x, y));
+            }
+            None
+        }
+        ChildRequestType::NotifySelectDragFinish => {
+            if let Some(wss) = workspace.wss.as_ref() {
+                wss.send(lib::message::ClientMessage::NotifySelectDragFinish);
             }
             None
         }

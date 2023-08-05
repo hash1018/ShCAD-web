@@ -10,12 +10,16 @@ use web_sys::CanvasRenderingContext2d;
 use crate::{
     algorithm::{
         coordinates_converter::convert_figure_to_device,
+        math::caculate_rectangle,
         visitor::{
-            drawer::{Drawer, SelectedByAnotherUserDrawer, SelectedDrawer},
+            drawer::{
+                draw_rectangle, fill_rectangle, Drawer, SelectedByAnotherUserDrawer, SelectedDrawer,
+            },
             finder::Finder,
             rect_pos_getter::RectPosGetter,
         },
     },
+    base::Rect,
     Coordinates,
 };
 
@@ -258,6 +262,20 @@ impl SharedUsers {
         }
         None
     }
+
+    pub fn set_select_drag_position(&self, user_id: String, position: Option<(f64, f64)>) {
+        let pos = self
+            .list
+            .borrow_mut()
+            .iter()
+            .position(|user| user.user_id == user_id);
+        if let Some(pos) = pos {
+            let mut list_borrow_mut = self.list.borrow_mut();
+            if let Some(user) = list_borrow_mut.get_mut(pos) {
+                user.set_select_drag_position(position);
+            }
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -268,6 +286,7 @@ pub struct SharedUser {
     last_mouse_position: Option<(f64, f64)>,
     mouse_position_queue: VecDeque<(f64, f64)>,
     text_info: Option<(f64, f64, Color)>,
+    select_drag_position: Option<(f64, f64)>,
 }
 
 impl SharedUser {
@@ -279,6 +298,7 @@ impl SharedUser {
             last_mouse_position: None,
             mouse_position_queue: VecDeque::new(),
             text_info: None,
+            select_drag_position: None,
         }
     }
 
@@ -359,6 +379,46 @@ impl SharedUser {
         if let Some(mouse_position) = self.mouse_position_queue.pop_back() {
             self.last_mouse_position = Some(mouse_position);
             self.mouse_position_queue.clear();
+        }
+    }
+
+    pub fn set_select_drag_position(&mut self, position: Option<(f64, f64)>) {
+        self.select_drag_position = position;
+    }
+
+    pub fn draw_select_drag_rect(
+        &mut self,
+        context: &CanvasRenderingContext2d,
+        coordinates: &Coordinates,
+    ) {
+        if let (Some(last_position), Some(drag_position), Some(color)) = (
+            self.last_mouse_position,
+            self.select_drag_position,
+            self.color,
+        ) {
+            if last_position != drag_position {
+                let rect = caculate_rectangle(last_position, drag_position, false);
+
+                let top_left =
+                    convert_figure_to_device(coordinates, rect.top_left.0, rect.top_left.1);
+                let bottom_right = convert_figure_to_device(
+                    coordinates,
+                    rect.top_left.0 + rect.width,
+                    rect.top_left.1 - rect.height,
+                );
+
+                let rect = Rect::new(
+                    top_left,
+                    bottom_right.0 - top_left.0,
+                    bottom_right.1 - top_left.1,
+                );
+
+                let mut fill_color = color;
+                fill_color.a = 125;
+                fill_rectangle(rect, &fill_color, context);
+
+                draw_rectangle(rect, &color, context);
+            }
         }
     }
 }

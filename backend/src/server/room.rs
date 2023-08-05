@@ -26,14 +26,18 @@ pub enum RoomMessage {
     NotifyMousePositionChanged(Arc<str>, VecDeque<(f64, f64)>),
     SelectFigure(Arc<str>, BTreeSet<usize>),
     UnselectFigureAll(Arc<str>),
+    NotifySelectDragStart(Arc<str>, f64, f64),
+    NotifySelectDragFinish(Arc<str>),
 }
 
+#[allow(clippy::type_complexity)]
 pub struct Room {
     id: Arc<str>,
     server_app_sender: Sender<ServerAppMessage>,
     users: Arc<Mutex<HashMap<Arc<str>, User>>>,
     figures: Arc<Mutex<BTreeMap<usize, FigureData>>>,
     selected_figures: Arc<Mutex<BTreeMap<Arc<str>, BTreeSet<usize>>>>,
+    select_drag_positions: Arc<Mutex<BTreeMap<Arc<str>, (f64, f64)>>>,
     sender: Sender<RoomMessage>, //Pass to new_user so that room's receiver can receive a message from user.
 }
 
@@ -47,6 +51,7 @@ impl Room {
             users: Arc::new(Mutex::new(HashMap::new())),
             figures: Arc::new(Mutex::new(BTreeMap::new())),
             selected_figures: Arc::new(Mutex::new(BTreeMap::new())),
+            select_drag_positions: Arc::new(Mutex::new(BTreeMap::new())),
             sender,
         };
 
@@ -61,6 +66,7 @@ impl Room {
         let server_app_sender_clone = self.server_app_sender.clone();
         let figures_clone = self.figures.clone();
         let selected_figures_clone = self.selected_figures.clone();
+        let select_drag_positions_clone = self.select_drag_positions.clone();
         let room_id = self.id.clone();
         tokio::spawn(async move {
             while let Some(message) = receiver.recv().await {
@@ -141,7 +147,29 @@ impl Room {
                                 .await;
                             }
                         }
-                        _ => {}
+                        RequestType::CurrentSelectDragPositions => {
+                            let mut users_lock = users_clone.lock().await;
+                            let select_drag_positions_lock =
+                                select_drag_positions_clone.lock().await;
+
+                            let mut map = BTreeMap::new();
+                            for (id, (x, y)) in select_drag_positions_lock.iter() {
+                                map.insert(id.to_string(), (*x, *y));
+                            }
+
+                            if let Some(user) = users_lock.get_mut(&user_id) {
+                                user.send_message(ServerMessage::ResponseInfo(
+                                    ResponseType::CurrentSelectDragPositions(map),
+                                ))
+                                .await;
+                            }
+                        }
+                        RequestType::CheckRoomExist(_) => {
+                            unreachable!()
+                        }
+                        RequestType::CheckUserExist(_, _) => {
+                            unreachable!()
+                        }
                     },
                     RoomMessage::NotifyMousePositionChanged(user_id, queue) => {
                         let mut users_lock = users_clone.lock().await;
@@ -174,6 +202,32 @@ impl Room {
                     RoomMessage::UnselectFigureAll(user_id) => {
                         unselect_all(user_id, selected_figures_clone.clone(), users_clone.clone())
                             .await;
+                    }
+                    RoomMessage::NotifySelectDragStart(user_id, x, y) => {
+                        let mut select_drag_positions_lock =
+                            select_drag_positions_clone.lock().await;
+                        select_drag_positions_lock.insert(user_id.clone(), (x, y));
+
+                        let mut users_lock = users_clone.lock().await;
+                        broadcast_except_for(
+                            &mut users_lock,
+                            &user_id,
+                            ServerMessage::NotifySelectDragStarted(user_id.to_string(), x, y),
+                        )
+                        .await;
+                    }
+                    RoomMessage::NotifySelectDragFinish(user_id) => {
+                        let mut select_drag_positions_lock =
+                            select_drag_positions_clone.lock().await;
+                        select_drag_positions_lock.remove(&user_id);
+
+                        let mut users_lock = users_clone.lock().await;
+                        broadcast_except_for(
+                            &mut users_lock,
+                            &user_id,
+                            ServerMessage::NotifySelectDragFinished(user_id.to_string()),
+                        )
+                        .await;
                     }
                 }
             }

@@ -144,6 +144,14 @@ impl Component for DrawArea {
                     self.draw_option = DrawOption::DrawAll;
                     return true;
                 }
+                UpdateReason::SelectDragFinished => {
+                    self.draw_option = DrawOption::DrawAll;
+                    return true;
+                }
+                UpdateReason::GetCurrentSelectDragPositions => {
+                    self.draw_option = DrawOption::DrawAll;
+                    return true;
+                }
                 _ => return false,
             }
         }
@@ -253,6 +261,7 @@ impl Component for DrawArea {
         };
 
         if let Some(should_actions) = should_actions {
+            let mut should_update = false;
             for should_action in should_actions {
                 match should_action {
                     ShouldAction::BackToSelect => {
@@ -262,7 +271,7 @@ impl Component for DrawArea {
                     }
                     ShouldAction::Rerender(draw_option) => {
                         self.draw_option = draw_option;
-                        return true;
+                        should_update = true;
                     }
                     ShouldAction::AddFigure(figure) => {
                         ctx.props()
@@ -284,10 +293,22 @@ impl Component for DrawArea {
                             .handler
                             .emit(ChildRequestType::UnselectFigureAll);
                     }
+                    ShouldAction::NotifySelectDragStart(x, y) => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::NotifySelectDragStart(x, y));
+                    }
+                    ShouldAction::NotifySelectDragFinish => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::NotifySelectDragFinish);
+                    }
                 }
             }
+            should_update
+        } else {
+            false
         }
-        false
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
@@ -379,6 +400,7 @@ impl DrawArea {
             for user in shared_users_borrow_mut.iter_mut() {
                 if !user.is_it_me() {
                     user.draw_mouse_cursor(&context, &coordinates);
+                    user.draw_select_drag_rect(&context, &coordinates);
                     if !user.check_mouse_position_queue_empty() {
                         mouse_position_all_empty = false;
                     }
