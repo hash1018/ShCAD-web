@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{any::Any, cell::RefCell, rc::Rc};
 
 use lib::{
     common::Color,
@@ -28,6 +28,10 @@ impl LineMode {
 }
 
 impl DrawMode for LineMode {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn mouse_left_press_event(
         &mut self,
         event: web_sys::MouseEvent,

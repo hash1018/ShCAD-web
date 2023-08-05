@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{any::Any, cell::RefCell, rc::Rc};
 
 use web_sys::MouseEvent;
 
@@ -16,6 +16,7 @@ pub mod pan_mode;
 pub mod select_mode;
 
 pub trait DrawMode {
+    fn as_any(&self) -> &dyn Any;
     fn mouse_left_press_event(
         &mut self,
         event: MouseEvent,

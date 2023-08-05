@@ -36,3 +36,20 @@ pub const TOTAL_SELECTED_FIGURE_COLOR_RECT: Color = Color {
     b: 255,
     a: 255,
 };
+
+#[derive(Debug, Clone, Copy)]
+pub struct Rect {
+    pub top_left: (f64, f64),
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Rect {
+    pub fn new(top_left: (f64, f64), width: f64, height: f64) -> Self {
+        Self {
+            top_left,
+            width,
+            height,
+        }
+    }
+}

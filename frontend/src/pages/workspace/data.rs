@@ -89,13 +89,12 @@ impl FigureMaintainer {
         }
 
         if len >= 2 {
-            if let (Some(top_y), Some(left_x), Some(width), Some(height)) = (
-                rect_pos_getter.top_y(),
-                rect_pos_getter.left_x(),
-                rect_pos_getter.width(),
-                rect_pos_getter.height(),
-            ) {
-                drawer.draw_total_selected_rect((left_x, top_y), width, height);
+            if let Some(rect) = rect_pos_getter.rect() {
+                drawer.draw_total_selected_rect(
+                    (rect.top_left.0, rect.top_left.1),
+                    rect.width,
+                    rect.height,
+                );
             }
         }
     }

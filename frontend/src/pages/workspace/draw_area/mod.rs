@@ -13,11 +13,17 @@ use yew::{html, Callback, Component, Context, Properties};
 
 use crate::{
     algorithm::{
-        coordinates_converter::{convert_device_to_figure, convert_figure_to_webgl},
+        coordinates_converter::{
+            convert_device_to_figure, convert_figure_to_device, convert_figure_to_webgl,
+        },
         draw_mode::{pan_mode::PanMode, select_mode::SelectMode, DrawMode},
-        visitor::drawer::DrawerGL,
+        visitor::drawer::{draw_rectangle, fill_rectangle, DrawerGL},
     },
-    base::{DrawModeType, DrawOption, ShouldAction},
+    base::{
+        DrawModeType, DrawOption, Rect, ShouldAction, SELECTED_FIGURE_COLOR,
+        TOTAL_SELECTED_FIGURE_COLOR_RECT,
+    },
+    Coordinates,
 };
 
 use self::{
@@ -335,6 +341,14 @@ impl DrawArea {
         let animation_handle_clone = self.animation_handle.clone();
 
         let callback_clone = callback.clone();
+
+        let mut select_drag_rect = Rc::new(None);
+        if let DrawModeType::SelectMode = self.current_mode.get_type() {
+            if let Some(select_mode) = self.current_mode.as_any().downcast_ref::<SelectMode>() {
+                select_drag_rect = Rc::new(select_mode.select_drag_rect());
+            }
+        }
+
         let closure = Closure::<dyn FnMut()>::new(move || {
             context.clear_rect(
                 0.0,
@@ -354,6 +368,8 @@ impl DrawArea {
             figure_maintainer
                 .borrow_mut()
                 .draw_selected_by_another_user(&context, &coordinates, shared_users.clone());
+
+            draw_select_drag_rect(select_drag_rect.clone(), &context, &coordinates);
 
             let user_list = shared_users.list();
 
@@ -463,5 +479,33 @@ fn canvas_css(draw_area: &DrawArea, current_mode: DrawModeType) -> &'static str 
             "width:100%; height:100%; cursor: url(\"/img/cursor.png\"), auto;"
         }
         DrawModeType::LineMode => "width:100%; height:100%; cursor: crosshair;",
+    }
+}
+
+fn draw_select_drag_rect(
+    rect: Rc<Option<Rect>>,
+    context: &CanvasRenderingContext2d,
+    coordinates: &Coordinates,
+) {
+    if let Some(rect) = *rect {
+        let top_left = convert_figure_to_device(coordinates, rect.top_left.0, rect.top_left.1);
+        let bottom_right = convert_figure_to_device(
+            coordinates,
+            rect.top_left.0 + rect.width,
+            rect.top_left.1 - rect.height,
+        );
+
+        let rect = Rect::new(
+            top_left,
+            bottom_right.0 - top_left.0,
+            bottom_right.1 - top_left.1,
+        );
+
+        let mut fill_color = SELECTED_FIGURE_COLOR;
+        fill_color.a = 125;
+        fill_rectangle(rect, &fill_color, context);
+
+        let color = TOTAL_SELECTED_FIGURE_COLOR_RECT;
+        draw_rectangle(rect, &color, context);
     }
 }

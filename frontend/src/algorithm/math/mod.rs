@@ -1,5 +1,7 @@
 use std::f64::consts::PI;
 
+use crate::base::Rect;
+
 const EPSILON: f64 = 0.0001;
 
 /// Compare two values
@@ -138,16 +140,12 @@ pub fn check_point_lies_on_line(
 ///
 /// # Returns
 ///
-///  first: top left x,y
-///
-///  second: width
-///
-///  third: height
+///  rect
 pub fn caculate_rectangle(
     first: (f64, f64),
     second: (f64, f64),
     y_axis_increase_downward: bool,
-) -> ((f64, f64), f64, f64) {
+) -> Rect {
     let (left_x, right_x) = if compare(first.0, second.0, EPSILON) == 1 {
         (second.0, first.0)
     } else {
@@ -167,8 +165,8 @@ pub fn caculate_rectangle(
     };
 
     if y_axis_increase_downward {
-        ((left_x, top_y), right_x - left_x, bottom_y - top_y)
+        Rect::new((left_x, top_y), right_x - left_x, bottom_y - top_y)
     } else {
-        ((left_x, top_y), right_x - left_x, top_y - bottom_y)
+        Rect::new((left_x, top_y), right_x - left_x, top_y - bottom_y)
     }
 }

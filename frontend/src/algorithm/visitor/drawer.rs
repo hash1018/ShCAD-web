@@ -6,7 +6,7 @@ use web_sys::{CanvasRenderingContext2d, WebGlProgram, WebGlRenderingContext};
 
 use crate::{
     algorithm::{coordinates_converter::convert_figure_to_device, math::caculate_rectangle},
-    base::{SELECTED_FIGURE_COLOR, TOTAL_SELECTED_FIGURE_COLOR_RECT},
+    base::{Rect, SELECTED_FIGURE_COLOR, TOTAL_SELECTED_FIGURE_COLOR_RECT},
     Coordinates,
 };
 
@@ -107,13 +107,13 @@ impl<'a> SelectedDrawer<'a> {
             figure_top_left.1 - figure_height,
         );
 
-        draw_rectangle(
+        let rect = Rect::new(
             top_left,
             bottom_right.0 - top_left.0,
             bottom_right.1 - top_left.1,
-            &color,
-            self.context,
         );
+
+        draw_rectangle(rect, &color, self.context);
     }
 }
 
@@ -128,8 +128,8 @@ impl Visitor for SelectedDrawer<'_> {
             fill_circle(start, 6.0, &color, self.context);
             fill_circle(end, 6.0, &color, self.context);
         } else {
-            let (top_left, width, height) = caculate_rectangle(start, end, true);
-            draw_rectangle(top_left, width, height, &color, self.context);
+            let rect = caculate_rectangle(start, end, true);
+            draw_rectangle(rect, &color, self.context);
         }
     }
 }
@@ -159,12 +159,12 @@ impl Visitor for SelectedByAnotherUserDrawer<'_> {
         let start = convert_figure_to_device(self.coordinates, line.start_x(), line.start_y());
         let end = convert_figure_to_device(self.coordinates, line.end_x(), line.end_y());
 
-        let (top_left, width, height) = caculate_rectangle(start, end, true);
-        draw_rectangle(top_left, width, height, &self.color, self.context);
+        let rect = caculate_rectangle(start, end, true);
+        draw_rectangle(rect, &self.color, self.context);
     }
 }
 
-fn draw_line(
+pub fn draw_line(
     start: (f64, f64),
     end: (f64, f64),
     color: &Color,
@@ -180,7 +180,12 @@ fn draw_line(
     context.stroke();
 }
 
-fn fill_circle(center: (f64, f64), radius: f64, color: &Color, context: &CanvasRenderingContext2d) {
+pub fn fill_circle(
+    center: (f64, f64),
+    radius: f64,
+    color: &Color,
+    context: &CanvasRenderingContext2d,
+) {
     let color_text = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
     context.set_fill_style(&color_text.into());
     context.begin_path();
@@ -189,17 +194,26 @@ fn fill_circle(center: (f64, f64), radius: f64, color: &Color, context: &CanvasR
     context.fill();
 }
 
-fn draw_rectangle(
-    top_left: (f64, f64),
-    width: f64,
-    height: f64,
-    color: &Color,
-    context: &CanvasRenderingContext2d,
-) {
+pub fn draw_rectangle(rect: Rect, color: &Color, context: &CanvasRenderingContext2d) {
     let color_text = format!("rgb({0},{1},{2})", color.r, color.g, color.b);
     context.set_stroke_style(&color_text.into());
     context.begin_path();
-    context.rect(top_left.0, top_left.1, width, height);
+    context.rect(rect.top_left.0, rect.top_left.1, rect.width, rect.height);
     context.close_path();
     context.stroke();
+}
+
+pub fn fill_rectangle(rect: Rect, color: &Color, context: &CanvasRenderingContext2d) {
+    let color_text = format!(
+        "rgba({0},{1},{2},{3})",
+        color.r,
+        color.g,
+        color.b,
+        color.a as f64 / 255.0
+    );
+    context.set_fill_style(&color_text.into());
+    context.begin_path();
+    context.rect(rect.top_left.0, rect.top_left.1, rect.width, rect.height);
+    context.close_path();
+    context.fill();
 }
