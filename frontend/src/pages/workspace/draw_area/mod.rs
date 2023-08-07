@@ -152,6 +152,10 @@ impl Component for DrawArea {
                     self.draw_option = DrawOption::DrawAll;
                     return true;
                 }
+                UpdateReason::SelectedFiguresUpdated => {
+                    self.draw_option = DrawOption::DrawAll;
+                    return true;
+                }
                 _ => return false,
             }
         }
@@ -302,6 +306,17 @@ impl Component for DrawArea {
                         ctx.props()
                             .handler
                             .emit(ChildRequestType::NotifySelectDragFinish);
+                    }
+                    ShouldAction::UpdateSelectedFigures(
+                        about_to_select_set,
+                        about_to_unselect_set,
+                    ) => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::UpdateSelectedFigures(
+                                about_to_select_set,
+                                about_to_unselect_set,
+                            ));
                     }
                 }
             }

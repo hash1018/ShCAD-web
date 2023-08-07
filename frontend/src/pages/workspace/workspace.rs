@@ -41,6 +41,7 @@ pub enum ChildRequestType {
     UnselectFigureAll,
     NotifySelectDragStart(f64, f64),
     NotifySelectDragFinish,
+    UpdateSelectedFigures(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -344,6 +345,40 @@ fn handle_server_message(
                 None
             }
         }
+        ServerMessage::SelectedFiguresUpdated(
+            user_id,
+            new_selected_figures,
+            new_unselected_figures,
+        ) => {
+            if user_id == user_name().unwrap() {
+                if let Some(new_selected_figures) = new_selected_figures {
+                    workspace
+                        .figure_maintainer
+                        .borrow_mut()
+                        .select(new_selected_figures);
+                }
+                if let Some(new_unselected_figures) = new_unselected_figures {
+                    workspace
+                        .figure_maintainer
+                        .borrow_mut()
+                        .unselect(new_unselected_figures);
+                }
+            } else {
+                if let Some(new_selected_figures) = new_selected_figures {
+                    workspace
+                        .figure_maintainer
+                        .borrow_mut()
+                        .select_by_another_user(user_id.clone(), new_selected_figures);
+                }
+                if let Some(new_unselected_figures) = new_unselected_figures {
+                    workspace
+                        .figure_maintainer
+                        .borrow_mut()
+                        .unselect_by_another_user(user_id, new_unselected_figures);
+                }
+            }
+            Some(UpdateReason::SelectedFiguresUpdated)
+        }
     };
 
     update_reason
@@ -412,6 +447,15 @@ fn handle_child_request(
         ChildRequestType::NotifySelectDragFinish => {
             if let Some(wss) = workspace.wss.as_ref() {
                 wss.send(lib::message::ClientMessage::NotifySelectDragFinish);
+            }
+            None
+        }
+        ChildRequestType::UpdateSelectedFigures(about_to_select_set, about_to_unselect_set) => {
+            if let Some(wss) = workspace.wss.as_ref() {
+                wss.send(lib::message::ClientMessage::UpdateSelectedFigures(
+                    about_to_select_set,
+                    about_to_unselect_set,
+                ));
             }
             None
         }

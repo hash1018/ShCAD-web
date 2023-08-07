@@ -15,6 +15,7 @@ pub enum ServerMessage {
     FigureUnselectedAll(UserId),
     NotifySelectDragStarted(UserId, f64, f64),
     NotifySelectDragFinished(UserId),
+    SelectedFiguresUpdated(UserId, Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -28,6 +29,7 @@ pub enum ClientMessage {
     UnselectFigureAll,
     NotifySelectDragStart(f64, f64),
     NotifySelectDragFinish,
+    UpdateSelectedFigures(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

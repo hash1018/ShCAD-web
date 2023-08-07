@@ -1,7 +1,10 @@
 use std::{any::Any, cell::RefCell, collections::BTreeSet, rc::Rc};
 
 use crate::{
-    algorithm::{math::caculate_rectangle, visitor::finder::Finder},
+    algorithm::{
+        math::caculate_rectangle,
+        visitor::finder::{DragRectFinder, Finder},
+    },
     base::{DrawOption, Rect},
     pages::workspace::{data::FigureMaintainer, draw_area::data::DrawAreaData},
 };
@@ -260,16 +263,40 @@ impl SubSelectMode for SubSelectDragMode {
         select_mode: &mut SelectMode,
         event: &web_sys::MouseEvent,
         data: &mut DrawAreaData,
-        _figures: Rc<RefCell<FigureMaintainer>>,
+        figures: Rc<RefCell<FigureMaintainer>>,
     ) -> (Option<Vec<ShouldAction>>, Option<ChangeSubMode>) {
         let (x, y) = select_mode.convert_figure_coordinates(event, data);
         self.current_x = x;
         self.current_y = y;
 
-        (
-            Some(vec![ShouldAction::Rerender(DrawOption::DrawAll)]),
-            None,
-        )
+        let rect = caculate_rectangle(
+            (self.prev_x, self.prev_y),
+            (self.current_x, self.current_y),
+            false,
+        );
+        let finder = DragRectFinder::new(rect);
+
+        let mut actions = Vec::new();
+
+        let len = figures.borrow().selected_list_len();
+        let mut figures_borrow_mut = figures.borrow_mut();
+
+        if let Some(set) = figures_borrow_mut.drag_search(&finder) {
+            let (about_to_select_set, about_to_unselect_set) =
+                figures_borrow_mut.compare_selected_list(set);
+            if about_to_select_set.is_some() || about_to_unselect_set.is_some() {
+                actions.push(ShouldAction::UpdateSelectedFigures(
+                    about_to_select_set,
+                    about_to_unselect_set,
+                ));
+            }
+        } else if len >= 1 {
+            actions.push(ShouldAction::UnselectFigureAll);
+        }
+
+        actions.push(ShouldAction::Rerender(DrawOption::DrawAll));
+
+        (Some(actions), None)
     }
 
     fn mouse_release_event(

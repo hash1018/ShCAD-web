@@ -28,6 +28,7 @@ pub enum RoomMessage {
     UnselectFigureAll(Arc<str>),
     NotifySelectDragStart(Arc<str>, f64, f64),
     NotifySelectDragFinish(Arc<str>),
+    UpdateSelectedFigures(Arc<str>, Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
 }
 
 #[allow(clippy::type_complexity)]
@@ -226,6 +227,45 @@ impl Room {
                             &mut users_lock,
                             &user_id,
                             ServerMessage::NotifySelectDragFinished(user_id.to_string()),
+                        )
+                        .await;
+                    }
+                    RoomMessage::UpdateSelectedFigures(
+                        user_id,
+                        about_to_select_set,
+                        about_to_unselect_set,
+                    ) => {
+                        let mut selected_figures_lock = selected_figures_clone.lock().await;
+                        if let Some(about_to_select_set) = about_to_select_set.as_ref() {
+                            if let Some(item) = selected_figures_lock.get_mut(&user_id) {
+                                item.append(&mut about_to_select_set.clone());
+                            } else {
+                                selected_figures_lock
+                                    .insert(user_id.clone(), about_to_select_set.clone());
+                            }
+                        }
+
+                        if let Some(about_to_unselect_set) = about_to_unselect_set.as_ref() {
+                            if let Some(item) = selected_figures_lock.get_mut(&user_id) {
+                                for id in about_to_unselect_set {
+                                    item.remove(id);
+                                }
+                                if item.is_empty() {
+                                    selected_figures_lock.remove(&user_id);
+                                }
+                            } else {
+                                unreachable!()
+                            }
+                        }
+
+                        let mut users_lock = users_clone.lock().await;
+                        broadcast(
+                            &mut users_lock,
+                            ServerMessage::SelectedFiguresUpdated(
+                                user_id.to_string(),
+                                about_to_select_set,
+                                about_to_unselect_set,
+                            ),
                         )
                         .await;
                     }

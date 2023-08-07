@@ -15,7 +15,7 @@ use crate::{
             drawer::{
                 draw_rectangle, fill_rectangle, Drawer, SelectedByAnotherUserDrawer, SelectedDrawer,
             },
-            finder::Finder,
+            finder::{DragRectFinder, Finder},
             rect_pos_getter::RectPosGetter,
         },
     },
@@ -135,6 +135,22 @@ impl FigureMaintainer {
         None
     }
 
+    pub fn drag_search(&mut self, finder: &DragRectFinder) -> Option<BTreeSet<usize>> {
+        let mut set = BTreeSet::new();
+        for (id, figure) in self.default_list.iter_mut() {
+            figure.accept(finder);
+            if finder.found() {
+                set.insert(*id);
+                finder.clear_found();
+            }
+        }
+        if set.is_empty() {
+            None
+        } else {
+            Some(set)
+        }
+    }
+
     pub fn select(&mut self, mut ids: BTreeSet<usize>) {
         self.selected_list.append(&mut ids);
     }
@@ -153,6 +169,20 @@ impl FigureMaintainer {
         }
     }
 
+    pub fn unselect_by_another_user(&mut self, user_id: String, ids: BTreeSet<usize>) {
+        if let Some(set) = self.selected_list_by_another_user.get_mut(&user_id) {
+            for id in ids.iter() {
+                set.remove(id);
+            }
+
+            if set.is_empty() {
+                self.selected_list_by_another_user.remove(&user_id);
+            }
+        } else {
+            unreachable!()
+        }
+    }
+
     pub fn unselect_all(&mut self) {
         self.selected_list.clear();
     }
@@ -167,6 +197,39 @@ impl FigureMaintainer {
 
     pub fn check_selected(&self, id: usize) -> bool {
         self.selected_list.get(&id).is_some()
+    }
+
+    pub fn compare_selected_list(
+        &self,
+        set: BTreeSet<usize>,
+    ) -> (Option<BTreeSet<usize>>, Option<BTreeSet<usize>>) {
+        let mut about_to_unselect_set = BTreeSet::new();
+        for id in self.selected_list.iter() {
+            if set.get(id).is_none() {
+                about_to_unselect_set.insert(*id);
+            }
+        }
+
+        let mut about_to_select_set = BTreeSet::new();
+        for id in set.iter() {
+            if self.selected_list.get(id).is_none() {
+                about_to_select_set.insert(*id);
+            }
+        }
+
+        let about_to_select_set = if !about_to_select_set.is_empty() {
+            Some(about_to_select_set)
+        } else {
+            None
+        };
+
+        let about_to_unselect_set = if !about_to_unselect_set.is_empty() {
+            Some(about_to_unselect_set)
+        } else {
+            None
+        };
+
+        (about_to_select_set, about_to_unselect_set)
     }
 }
 

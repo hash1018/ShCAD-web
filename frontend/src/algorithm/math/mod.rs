@@ -135,6 +135,39 @@ pub fn check_point_lies_on_line(
 
     false
 }
+
+pub fn check_point_lies_inside_rect(point: (f64, f64), rect: Rect, tolerance: f64) -> bool {
+    let bottom_right = (rect.top_left.0 + rect.width, rect.top_left.1 - rect.height);
+
+    point.0 >= rect.top_left.0 - tolerance
+        && point.0 <= bottom_right.0 + tolerance
+        && point.1 <= rect.top_left.1 + tolerance
+        && point.1 >= bottom_right.1 - tolerance
+}
+
+pub fn check_two_line_segments_intersect(
+    start_1: (f64, f64),
+    end_1: (f64, f64),
+    start_2: (f64, f64),
+    end_2: (f64, f64),
+) -> Option<(f64, f64)> {
+    let s1_x = end_1.0 - start_1.0;
+    let s1_y = end_1.1 - start_1.1;
+    let s2_x = end_2.0 - start_2.0;
+    let s2_y = end_2.1 - start_2.1;
+
+    let s = (-s1_y * (start_1.0 - start_2.0) + s1_x * (start_1.1 - start_2.1))
+        / (-s2_x * s1_y + s1_x * s2_y);
+    let t = (s2_x * (start_1.1 - start_2.1) - s2_y * (start_1.0 - start_2.0))
+        / (-s2_x * s1_y + s1_x * s2_y);
+
+    if (0.0..=1.0).contains(&s) && (0.0..=1.0).contains(&t) {
+        return Some((start_1.0 + (t * s1_x), start_1.1 + (t * s1_y)));
+    }
+
+    None
+}
+
 /// Caculate rectangle point with two points.
 /// # Arguments
 ///

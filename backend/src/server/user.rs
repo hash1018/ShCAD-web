@@ -93,6 +93,14 @@ async fn handle_message(
                     ClientMessage::NotifySelectDragFinish => {
                         RoomMessage::NotifySelectDragFinish(id.clone())
                     }
+                    ClientMessage::UpdateSelectedFigures(
+                        about_to_select_set,
+                        about_to_unselect_set,
+                    ) => RoomMessage::UpdateSelectedFigures(
+                        id.clone(),
+                        about_to_select_set,
+                        about_to_unselect_set,
+                    ),
                     _ => {
                         continue;
                     }

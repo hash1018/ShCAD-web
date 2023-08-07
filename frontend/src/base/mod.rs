@@ -19,6 +19,7 @@ pub enum ShouldAction {
     UnselectFigureAll,
     NotifySelectDragStart(f64, f64),
     NotifySelectDragFinish,
+    UpdateSelectedFigures(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
 }
 
 impl fmt::Debug for ShouldAction {
@@ -50,6 +51,9 @@ impl fmt::Debug for ShouldAction {
             }
             Self::NotifySelectDragFinish => {
                 write!(f, "ShouldAction::NotifySelectDragFinish")
+            }
+            Self::UpdateSelectedFigures(_, _) => {
+                write!(f, "ShouldAction::UpdateSelectedFigures")
             }
         }
     }
