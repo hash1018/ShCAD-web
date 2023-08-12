@@ -55,6 +55,12 @@ impl FigureMaintainer {
         self.default_list.append(&mut figures);
     }
 
+    pub fn delete_to_default(&mut self, ids: &BTreeSet<usize>) {
+        for id in ids.iter() {
+            self.default_list.remove(id);
+        }
+    }
+
     pub fn set_preview(&mut self, preview: Option<Box<dyn Figure>>) {
         self.preview = preview;
     }
@@ -155,7 +161,7 @@ impl FigureMaintainer {
         self.selected_list.append(&mut ids);
     }
 
-    pub fn unselect(&mut self, ids: BTreeSet<usize>) {
+    pub fn unselect(&mut self, ids: &BTreeSet<usize>) {
         for id in ids.iter() {
             self.selected_list.remove(id);
         }
@@ -178,8 +184,23 @@ impl FigureMaintainer {
             if set.is_empty() {
                 self.selected_list_by_another_user.remove(&user_id);
             }
-        } else {
-            unreachable!()
+        }
+    }
+
+    pub fn try_unselect_by_all_users(&mut self, ids: &BTreeSet<usize>) {
+        let mut remove_vec = Vec::new();
+        for (user_id, set) in self.selected_list_by_another_user.iter_mut() {
+            for id in ids.iter() {
+                set.remove(id);
+            }
+
+            if set.is_empty() {
+                remove_vec.push(user_id.clone());
+            }
+        }
+
+        for remove_id in remove_vec {
+            self.selected_list_by_another_user.remove(&remove_id);
         }
     }
 
@@ -230,6 +251,10 @@ impl FigureMaintainer {
         };
 
         (about_to_select_set, about_to_unselect_set)
+    }
+
+    pub fn clone_selected_list(&self) -> BTreeSet<usize> {
+        self.selected_list.clone()
     }
 }
 

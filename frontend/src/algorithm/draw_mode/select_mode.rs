@@ -115,6 +115,20 @@ impl DrawMode for SelectMode {
         actions
     }
 
+    fn key_down_event(
+        &mut self,
+        event: web_sys::KeyboardEvent,
+        figures: Rc<RefCell<FigureMaintainer>>,
+    ) -> Option<Vec<ShouldAction>> {
+        //Delete key down.
+        if event.key_code() == 46 {
+            let selected_list = figures.borrow().clone_selected_list();
+            Some(vec![ShouldAction::DeleteFigures(selected_list)])
+        } else {
+            None
+        }
+    }
+
     fn get_type(&self) -> super::DrawModeType {
         super::DrawModeType::SelectMode
     }
@@ -187,10 +201,13 @@ impl SubSelectMode for SubSelectDefaultMode {
             } else {
                 let (about_to_select_set, about_unselect_set) =
                     f_m_borrow_mut.compare_selected_list(ids);
-                actions.push(ShouldAction::UpdateSelectedFigures(
-                    about_to_select_set,
-                    about_unselect_set,
-                ));
+
+                if about_to_select_set.is_some() || about_unselect_set.is_some() {
+                    actions.push(ShouldAction::UpdateSelectedFigures(
+                        about_to_select_set,
+                        about_unselect_set,
+                    ));
+                }
             }
         } else {
             if f_m_borrow_mut.selected_list_len() != 0 {

@@ -1,6 +1,6 @@
 use std::{any::Any, cell::RefCell, rc::Rc};
 
-use web_sys::MouseEvent;
+use web_sys::{KeyboardEvent, MouseEvent};
 
 use crate::{
     base::{DrawModeType, ShouldAction},
@@ -17,23 +17,33 @@ pub mod select_mode;
 
 pub trait DrawMode {
     fn as_any(&self) -> &dyn Any;
+
     fn mouse_left_press_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
         figures: Rc<RefCell<FigureMaintainer>>,
     ) -> Option<Vec<ShouldAction>>;
+
     fn mouse_mouse_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
         figures: Rc<RefCell<FigureMaintainer>>,
     ) -> Option<Vec<ShouldAction>>;
+
     fn mouse_release_event(
         &mut self,
         event: MouseEvent,
         data: &mut DrawAreaData,
     ) -> Option<Vec<ShouldAction>>;
+
+    fn key_down_event(
+        &mut self,
+        event: KeyboardEvent,
+        figures: Rc<RefCell<FigureMaintainer>>,
+    ) -> Option<Vec<ShouldAction>>;
+
     fn get_type(&self) -> DrawModeType;
 
     fn convert_figure_coordinates(&self, event: &MouseEvent, data: &DrawAreaData) -> (f64, f64) {

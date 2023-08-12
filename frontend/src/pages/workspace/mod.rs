@@ -23,4 +23,5 @@ pub enum UpdateReason {
     SelectDragFinished,
     GetCurrentSelectDragPositions,
     SelectedFiguresUpdated,
+    FigureDeleted,
 }

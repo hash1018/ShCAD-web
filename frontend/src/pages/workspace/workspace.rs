@@ -42,6 +42,7 @@ pub enum ChildRequestType {
     NotifySelectDragStart(f64, f64),
     NotifySelectDragFinish,
     UpdateSelectedFigures(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
+    DeleteFigures(BTreeSet<usize>),
 }
 
 #[derive(Clone, PartialEq, Properties)]
@@ -361,7 +362,7 @@ fn handle_server_message(
                     workspace
                         .figure_maintainer
                         .borrow_mut()
-                        .unselect(new_unselected_figures);
+                        .unselect(&new_unselected_figures);
                 }
             } else {
                 if let Some(new_selected_figures) = new_selected_figures {
@@ -378,6 +379,14 @@ fn handle_server_message(
                 }
             }
             Some(UpdateReason::SelectedFiguresUpdated)
+        }
+        ServerMessage::FigureDeleted(_user_id, deleted_ids) => {
+            let mut f_m_borrow_mut = workspace.figure_maintainer.borrow_mut();
+            f_m_borrow_mut.delete_to_default(&deleted_ids);
+            f_m_borrow_mut.unselect(&deleted_ids);
+            f_m_borrow_mut.try_unselect_by_all_users(&deleted_ids);
+
+            Some(UpdateReason::FigureDeleted)
         }
     };
 
@@ -456,6 +465,12 @@ fn handle_child_request(
                     about_to_select_set,
                     about_to_unselect_set,
                 ));
+            }
+            None
+        }
+        ChildRequestType::DeleteFigures(ids) => {
+            if let Some(wss) = workspace.wss.as_ref() {
+                wss.send(lib::message::ClientMessage::DeleteFigures(ids));
             }
             None
         }

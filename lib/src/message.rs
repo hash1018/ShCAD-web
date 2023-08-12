@@ -16,6 +16,7 @@ pub enum ServerMessage {
     NotifySelectDragStarted(UserId, f64, f64),
     NotifySelectDragFinished(UserId),
     SelectedFiguresUpdated(UserId, Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
+    FigureDeleted(UserId, BTreeSet<usize>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -30,6 +31,7 @@ pub enum ClientMessage {
     NotifySelectDragStart(f64, f64),
     NotifySelectDragFinish,
     UpdateSelectedFigures(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
+    DeleteFigures(BTreeSet<usize>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

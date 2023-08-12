@@ -29,6 +29,7 @@ pub enum RoomMessage {
     NotifySelectDragStart(Arc<str>, f64, f64),
     NotifySelectDragFinish(Arc<str>),
     UpdateSelectedFigures(Arc<str>, Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
+    DeleteFigures(Arc<str>, BTreeSet<usize>),
 }
 
 #[allow(clippy::type_complexity)]
@@ -266,6 +267,34 @@ impl Room {
                                 about_to_select_set,
                                 about_to_unselect_set,
                             ),
+                        )
+                        .await;
+                    }
+                    RoomMessage::DeleteFigures(user_id, ids) => {
+                        let mut selected_figures_lock = selected_figures_clone.lock().await;
+                        let mut remove_vec = Vec::new();
+                        for (remove_id, set) in selected_figures_lock.iter_mut() {
+                            for i in ids.iter() {
+                                set.remove(i);
+                            }
+                            if set.is_empty() {
+                                remove_vec.push(remove_id.clone());
+                            }
+                        }
+
+                        for remove_id in remove_vec {
+                            selected_figures_lock.remove(&remove_id);
+                        }
+
+                        let mut figures_lock = figures_clone.lock().await;
+                        for id in ids.iter() {
+                            figures_lock.remove(id);
+                        }
+
+                        let mut users_lock = users_clone.lock().await;
+                        broadcast(
+                            &mut users_lock,
+                            ServerMessage::FigureDeleted(user_id.to_string(), ids),
                         )
                         .await;
                     }

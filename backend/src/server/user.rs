@@ -101,6 +101,9 @@ async fn handle_message(
                         about_to_select_set,
                         about_to_unselect_set,
                     ),
+                    ClientMessage::DeleteFigures(ids) => {
+                        RoomMessage::DeleteFigures(id.clone(), ids)
+                    }
                     _ => {
                         continue;
                     }

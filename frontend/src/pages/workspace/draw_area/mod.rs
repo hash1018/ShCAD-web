@@ -156,6 +156,10 @@ impl Component for DrawArea {
                     self.draw_option = DrawOption::DrawAll;
                     return true;
                 }
+                UpdateReason::FigureDeleted => {
+                    self.draw_option = DrawOption::DrawAll;
+                    return true;
+                }
                 _ => return false,
             }
         }
@@ -225,18 +229,9 @@ impl Component for DrawArea {
                     Some(vec![ShouldAction::Rerender(DrawOption::Remain)])
                 }
             }
-            DrawAreaMessage::KeyDown(event) => {
-                //Esc key down.
-                if event.key_code() == 27 {
-                    if self.current_mode.get_type() != DrawModeType::SelectMode {
-                        Some(vec![ShouldAction::BackToSelect])
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
+            DrawAreaMessage::KeyDown(event) => self
+                .current_mode
+                .key_down_event(event, ctx.props().figure_maintainer.clone()),
             DrawAreaMessage::Wheel(event) => {
                 if event.ctrl_key() || event.meta_key() {
                     if event.delta_y() < 0.0 {
@@ -317,6 +312,11 @@ impl Component for DrawArea {
                                 about_to_select_set,
                                 about_to_unselect_set,
                             ));
+                    }
+                    ShouldAction::DeleteFigures(ids) => {
+                        ctx.props()
+                            .handler
+                            .emit(ChildRequestType::DeleteFigures(ids));
                     }
                 }
             }

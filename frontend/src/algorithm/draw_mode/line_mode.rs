@@ -82,6 +82,19 @@ impl DrawMode for LineMode {
         None
     }
 
+    fn key_down_event(
+        &mut self,
+        event: web_sys::KeyboardEvent,
+        _figures: Rc<RefCell<FigureMaintainer>>,
+    ) -> Option<Vec<ShouldAction>> {
+        //Esc key down.
+        if event.key_code() == 27 {
+            Some(vec![ShouldAction::BackToSelect])
+        } else {
+            None
+        }
+    }
+
     fn get_type(&self) -> super::DrawModeType {
         super::DrawModeType::LineMode
     }
