@@ -171,28 +171,42 @@ impl SubSelectMode for SubSelectDefaultMode {
 
         let mut f_m_borrow_mut = figure_maintainer.borrow_mut();
 
-        let mut actions = None;
+        let mut actions = Vec::new();
         let mut change_sub_mode = None;
 
         if let Some(id) = f_m_borrow_mut.search(&finder) {
-            if !f_m_borrow_mut.check_selected(id) {
-                let mut ids = BTreeSet::new();
-                ids.insert(id);
-                actions = Some(vec![ShouldAction::SelectFigure(ids)]);
+            let mut ids = BTreeSet::new();
+            ids.insert(id);
+
+            if event.shift_key() {
+                if f_m_borrow_mut.check_selected(id) {
+                    actions.push(ShouldAction::UpdateSelectedFigures(None, Some(ids)));
+                } else {
+                    actions.push(ShouldAction::SelectFigure(ids));
+                }
+            } else {
+                let (about_to_select_set, about_unselect_set) =
+                    f_m_borrow_mut.compare_selected_list(ids);
+                actions.push(ShouldAction::UpdateSelectedFigures(
+                    about_to_select_set,
+                    about_unselect_set,
+                ));
             }
         } else {
-            let mut actions_tmp = Vec::new();
-
             if f_m_borrow_mut.selected_list_len() != 0 {
-                actions_tmp.push(ShouldAction::UnselectFigureAll);
+                actions.push(ShouldAction::UnselectFigureAll);
             }
 
-            actions_tmp.push(ShouldAction::NotifySelectDragStart(x, y));
+            actions.push(ShouldAction::NotifySelectDragStart(x, y));
 
             change_sub_mode = Some(ChangeSubMode::DragSelect);
-
-            actions = Some(actions_tmp);
         }
+
+        let actions = if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        };
 
         (actions, change_sub_mode)
     }
