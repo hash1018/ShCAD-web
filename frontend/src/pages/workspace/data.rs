@@ -184,6 +184,8 @@ impl FigureMaintainer {
             if set.is_empty() {
                 self.selected_list_by_another_user.remove(&user_id);
             }
+        } else {
+            unreachable!()
         }
     }
 
