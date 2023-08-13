@@ -21,6 +21,7 @@ use crate::server::ServerApp;
 
 mod handler;
 mod server;
+mod syncing_system;
 
 #[derive(Parser, Debug, Clone)]
 #[clap(name = "server", about = "A server for our wasm project!")]

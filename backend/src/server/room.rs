@@ -16,6 +16,8 @@ use tokio::sync::{
 };
 use tracing::log;
 
+use crate::syncing_system::selection::{select, unselect};
+
 use super::{user::User, ServerAppMessage};
 
 #[derive(Debug)]
@@ -36,11 +38,8 @@ pub enum RoomMessage {
 pub struct Room {
     id: Arc<str>,
     server_app_sender: Sender<ServerAppMessage>,
-    users: Arc<Mutex<HashMap<Arc<str>, User>>>,
-    figures: Arc<Mutex<BTreeMap<usize, FigureData>>>,
-    selected_figures: Arc<Mutex<BTreeMap<Arc<str>, BTreeSet<usize>>>>,
-    select_drag_positions: Arc<Mutex<BTreeMap<Arc<str>, (f64, f64)>>>,
     sender: Sender<RoomMessage>, //Pass to new_user so that room's receiver can receive a message from user.
+    room_inner: Arc<Mutex<RoomInner>>,
 }
 
 impl Room {
@@ -50,11 +49,8 @@ impl Room {
         let room = Self {
             id,
             server_app_sender,
-            users: Arc::new(Mutex::new(HashMap::new())),
-            figures: Arc::new(Mutex::new(BTreeMap::new())),
-            selected_figures: Arc::new(Mutex::new(BTreeMap::new())),
-            select_drag_positions: Arc::new(Mutex::new(BTreeMap::new())),
             sender,
+            room_inner: Arc::new(Mutex::new(RoomInner::new())),
         };
 
         room.run(receiver);
@@ -64,110 +60,100 @@ impl Room {
 
     #[allow(clippy::single_match)]
     fn run(&self, mut receiver: Receiver<RoomMessage>) {
-        let users_clone = self.users.clone();
         let server_app_sender_clone = self.server_app_sender.clone();
-        let figures_clone = self.figures.clone();
-        let selected_figures_clone = self.selected_figures.clone();
-        let select_drag_positions_clone = self.select_drag_positions.clone();
         let room_id = self.id.clone();
+        let room_inner = self.room_inner.clone();
         tokio::spawn(async move {
             while let Some(message) = receiver.recv().await {
                 match message {
                     RoomMessage::LeaveUser(user_id) => {
-                        {
-                            log::info!("LeaveUser user_id = {user_id}");
-                            let mut users_lock = users_clone.lock().await;
-                            users_lock.remove(&user_id);
-                            log::info!("now users = {0:?}", *users_lock);
-                            if users_lock.is_empty() {
-                                let _ = server_app_sender_clone
-                                    .send(ServerAppMessage::DeleteRoom(room_id.clone()))
-                                    .await;
-                                break;
-                            } else {
-                                broadcast(
-                                    &mut users_lock,
-                                    ServerMessage::Notify(NotifyType::UserLeft(
-                                        user_id.to_string(),
-                                    )),
-                                )
+                        log::info!("LeaveUser user_id = {user_id}");
+                        let mut room_inner_lock = room_inner.lock().await;
+                        room_inner_lock.users.remove(&user_id);
+                        log::info!("now users = {0:?}", room_inner_lock.users);
+                        if room_inner_lock.users.is_empty() {
+                            let _ = server_app_sender_clone
+                                .send(ServerAppMessage::DeleteRoom(room_id.clone()))
                                 .await;
-                            }
-                        }
-                        {
-                            unselect_all(
-                                user_id,
-                                selected_figures_clone.clone(),
-                                users_clone.clone(),
+                            break;
+                        } else {
+                            broadcast(
+                                &mut room_inner_lock.users,
+                                ServerMessage::Notify(NotifyType::UserLeft(user_id.to_string())),
                             )
                             .await;
                         }
+
+                        unselect_all(user_id, &mut room_inner_lock).await;
                     }
                     RoomMessage::AddFigure(data) => {
                         static FIGURE_ID: AtomicUsize = AtomicUsize::new(1);
                         let new_id = FIGURE_ID.fetch_add(1, Ordering::Relaxed);
 
-                        figures_clone.lock().await.insert(new_id, data.clone());
-                        let mut users_lock = users_clone.lock().await;
+                        let mut room_inner_lock = room_inner.lock().await;
+
+                        room_inner_lock.figures.insert(new_id, data.clone());
+
                         broadcast(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             ServerMessage::Notify(NotifyType::FigureAdded(new_id, data)),
                         )
                         .await;
                     }
                     RoomMessage::RequestInfo(user_id, request_type) => match request_type {
                         RequestType::CurrentFigures => {
-                            let mut users_lock = users_clone.lock().await;
-                            let figures = figures_clone.lock().await.clone();
-                            if let Some(user) = users_lock.get_mut(&user_id) {
-                                user.send_message(ServerMessage::Response(
-                                    ResponseType::CurrentFigures(figures),
-                                ))
-                                .await;
-                            }
+                            let mut room_inner_lock = room_inner.lock().await;
+
+                            let figures = room_inner_lock.figures.clone();
+
+                            unicast(
+                                &mut room_inner_lock.users,
+                                &user_id,
+                                ServerMessage::Response(ResponseType::CurrentFigures(figures)),
+                            )
+                            .await;
                         }
                         RequestType::CurrentSharedUsers => {
-                            let mut users_lock = users_clone.lock().await;
+                            let mut room_inner_lock = room_inner.lock().await;
+
                             let mut vec = Vec::new();
-                            for (user_id, _) in users_lock.iter() {
+
+                            for (user_id, _) in room_inner_lock.users.iter() {
                                 vec.push(user_id.to_string());
                             }
 
                             unicast(
-                                &mut users_lock,
+                                &mut room_inner_lock.users,
                                 &user_id,
                                 ServerMessage::Response(ResponseType::CurrentSharedUsers(vec)),
                             )
                             .await;
                         }
                         RequestType::CurrentSelectedFigures => {
-                            let mut users_lock = users_clone.lock().await;
-                            let selected_figures_lock = selected_figures_clone.lock().await;
+                            let mut room_inner_lock = room_inner.lock().await;
 
                             let mut map = BTreeMap::new();
-                            for (id, ids) in selected_figures_lock.iter() {
+                            for (id, ids) in room_inner_lock.selected_figures.iter() {
                                 map.insert(id.to_string(), ids.clone());
                             }
 
                             unicast(
-                                &mut users_lock,
+                                &mut room_inner_lock.users,
                                 &user_id,
                                 ServerMessage::Response(ResponseType::CurrentSelectedFigures(map)),
                             )
                             .await;
                         }
                         RequestType::CurrentSelectDragPositions => {
-                            let mut users_lock = users_clone.lock().await;
-                            let select_drag_positions_lock =
-                                select_drag_positions_clone.lock().await;
+                            let mut room_inner_lock = room_inner.lock().await;
 
                             let mut map = BTreeMap::new();
-                            for (id, (x, y)) in select_drag_positions_lock.iter() {
+                            for (id, (x, y)) in room_inner_lock.select_drag_positions.iter() {
                                 map.insert(id.to_string(), (*x, *y));
                             }
 
                             unicast(
-                                &mut users_lock,
+                                &mut room_inner_lock.users,
                                 &user_id,
                                 ServerMessage::Response(ResponseType::CurrentSelectDragPositions(
                                     map,
@@ -183,9 +169,10 @@ impl Room {
                         }
                     },
                     RoomMessage::NotifyMousePositionChanged(user_id, queue) => {
-                        let mut users_lock = users_clone.lock().await;
+                        let mut room_inner_lock = room_inner.lock().await;
+
                         broadcast_except_for(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Notify(NotifyType::UserMousePositionChanged(
                                 user_id.to_string(),
@@ -195,15 +182,13 @@ impl Room {
                         .await;
                     }
                     RoomMessage::SelectFigure(user_id, ids) => {
-                        let mut selected_figures_lock = selected_figures_clone.lock().await;
-                        let figures_lock = figures_clone.lock().await;
+                        let mut room_inner_lock = room_inner.lock().await;
 
                         let (accepted_set, _rejected_set) =
-                            select(&mut selected_figures_lock, &figures_lock, &user_id, ids);
+                            select(&mut room_inner_lock, &user_id, ids);
 
-                        let mut users_lock = users_clone.lock().await;
                         broadcast_except_for(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Notify(NotifyType::FigureSelected(
                                 user_id.to_string(),
@@ -213,24 +198,25 @@ impl Room {
                         .await;
 
                         unicast(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Accepted(AcceptedType::FigureSelected(accepted_set)),
                         )
                         .await;
                     }
                     RoomMessage::UnselectFigureAll(user_id) => {
-                        unselect_all(user_id, selected_figures_clone.clone(), users_clone.clone())
-                            .await;
+                        let mut room_inner_lock = room_inner.lock().await;
+                        unselect_all(user_id, &mut room_inner_lock).await;
                     }
                     RoomMessage::NotifySelectDragStart(user_id, x, y) => {
-                        let mut select_drag_positions_lock =
-                            select_drag_positions_clone.lock().await;
-                        select_drag_positions_lock.insert(user_id.clone(), (x, y));
+                        let mut room_inner_lock = room_inner.lock().await;
 
-                        let mut users_lock = users_clone.lock().await;
+                        room_inner_lock
+                            .select_drag_positions
+                            .insert(user_id.clone(), (x, y));
+
                         broadcast_except_for(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Notify(NotifyType::SelectDragStarted(
                                 user_id.to_string(),
@@ -241,13 +227,12 @@ impl Room {
                         .await;
                     }
                     RoomMessage::NotifySelectDragFinish(user_id) => {
-                        let mut select_drag_positions_lock =
-                            select_drag_positions_clone.lock().await;
-                        select_drag_positions_lock.remove(&user_id);
+                        let mut room_inner_lock = room_inner.lock().await;
 
-                        let mut users_lock = users_clone.lock().await;
+                        room_inner_lock.select_drag_positions.remove(&user_id);
+
                         broadcast_except_for(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Notify(NotifyType::SelectDragFinished(
                                 user_id.to_string(),
@@ -260,16 +245,12 @@ impl Room {
                         about_to_select_set,
                         about_to_unselect_set,
                     ) => {
-                        let mut selected_figures_lock = selected_figures_clone.lock().await;
-                        let figures_lock = figures_clone.lock().await;
+                        let mut room_inner_lock = room_inner.lock().await;
+
                         let (accepted_select_set, _rejected_select_set) =
                             if let Some(about_to_select_set) = about_to_select_set {
-                                let (a, r) = select(
-                                    &mut selected_figures_lock,
-                                    &figures_lock,
-                                    &user_id,
-                                    about_to_select_set,
-                                );
+                                let (a, r) =
+                                    select(&mut room_inner_lock, &user_id, about_to_select_set);
                                 (Some(a), Some(r))
                             } else {
                                 (None, None)
@@ -277,20 +258,15 @@ impl Room {
 
                         let (accepted_unselect_set, _rejected_unselect_set) =
                             if let Some(about_to_unselect_set) = about_to_unselect_set {
-                                let (a, r) = unselect(
-                                    &mut selected_figures_lock,
-                                    &figures_lock,
-                                    &user_id,
-                                    about_to_unselect_set,
-                                );
+                                let (a, r) =
+                                    unselect(&mut room_inner_lock, &user_id, about_to_unselect_set);
                                 (Some(a), Some(r))
                             } else {
                                 (None, None)
                             };
 
-                        let mut users_lock = users_clone.lock().await;
                         broadcast_except_for(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Notify(NotifyType::SelectedFiguresUpdated(
                                 user_id.to_string(),
@@ -301,7 +277,7 @@ impl Room {
                         .await;
 
                         unicast(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             &user_id,
                             ServerMessage::Accepted(AcceptedType::SelectedFiguresUpdated(
                                 accepted_select_set,
@@ -311,9 +287,10 @@ impl Room {
                         .await;
                     }
                     RoomMessage::DeleteFigures(_user_id, ids) => {
-                        let mut selected_figures_lock = selected_figures_clone.lock().await;
+                        let mut room_inner_lock = room_inner.lock().await;
+
                         let mut remove_vec = Vec::new();
-                        for (remove_id, set) in selected_figures_lock.iter_mut() {
+                        for (remove_id, set) in room_inner_lock.selected_figures.iter_mut() {
                             for i in ids.iter() {
                                 set.remove(i);
                             }
@@ -323,17 +300,15 @@ impl Room {
                         }
 
                         for remove_id in remove_vec {
-                            selected_figures_lock.remove(&remove_id);
+                            room_inner_lock.selected_figures.remove(&remove_id);
                         }
 
-                        let mut figures_lock = figures_clone.lock().await;
                         for id in ids.iter() {
-                            figures_lock.remove(id);
+                            room_inner_lock.figures.remove(id);
                         }
 
-                        let mut users_lock = users_clone.lock().await;
                         broadcast(
-                            &mut users_lock,
+                            &mut room_inner_lock.users,
                             ServerMessage::Notify(NotifyType::FigureDeleted(ids)),
                         )
                         .await;
@@ -344,20 +319,20 @@ impl Room {
     }
 
     pub async fn join_user(&self, mut new_user: User) {
+        let mut room_inner_lock = self.room_inner.lock().await;
         let new_user_id = new_user.id();
         new_user.set_channel(self.sender.clone()).await;
 
-        let mut users_lock = self.users.lock().await;
-        users_lock.insert(new_user.id(), new_user);
+        room_inner_lock.users.insert(new_user.id(), new_user);
 
         broadcast_except_for(
-            &mut users_lock,
+            &mut room_inner_lock.users,
             &new_user_id,
             ServerMessage::Notify(NotifyType::UserJoined(new_user_id.to_string())),
         )
         .await;
         unicast(
-            &mut users_lock,
+            &mut room_inner_lock.users,
             &new_user_id,
             ServerMessage::Accepted(AcceptedType::UserJoined),
         )
@@ -365,21 +340,36 @@ impl Room {
     }
 
     pub async fn check_exist_user(&self, user_id: &str) -> bool {
-        self.users.lock().await.get(user_id).is_some()
+        self.room_inner.lock().await.users.get(user_id).is_some()
     }
 }
 
-async fn broadcast(
-    users_lock: &mut MutexGuard<'_, HashMap<Arc<str>, User>>,
-    message: ServerMessage,
-) {
+pub struct RoomInner {
+    pub users: HashMap<Arc<str>, User>,
+    pub figures: BTreeMap<usize, FigureData>,
+    pub selected_figures: BTreeMap<Arc<str>, BTreeSet<usize>>,
+    pub select_drag_positions: BTreeMap<Arc<str>, (f64, f64)>,
+}
+
+impl RoomInner {
+    pub fn new() -> Self {
+        Self {
+            users: HashMap::new(),
+            figures: BTreeMap::new(),
+            selected_figures: BTreeMap::new(),
+            select_drag_positions: BTreeMap::new(),
+        }
+    }
+}
+
+async fn broadcast(users_lock: &mut HashMap<Arc<str>, User>, message: ServerMessage) {
     for (_, user) in users_lock.iter_mut() {
         user.send_message(message.clone()).await;
     }
 }
 
 async fn broadcast_except_for(
-    users_lock: &mut MutexGuard<'_, HashMap<Arc<str>, User>>,
+    users_lock: &mut HashMap<Arc<str>, User>,
     except_user_id: &Arc<str>,
     message: ServerMessage,
 ) {
@@ -391,7 +381,7 @@ async fn broadcast_except_for(
 }
 
 async fn unicast(
-    users_lock: &mut MutexGuard<'_, HashMap<Arc<str>, User>>,
+    users_lock: &mut HashMap<Arc<str>, User>,
     user_id: &Arc<str>,
     message: ServerMessage,
 ) {
@@ -400,83 +390,20 @@ async fn unicast(
     }
 }
 
-async fn unselect_all(
-    user_id: Arc<str>,
-    selected_figures: Arc<Mutex<BTreeMap<Arc<str>, BTreeSet<usize>>>>,
-    users: Arc<Mutex<HashMap<Arc<str>, User>>>,
-) {
-    let mut selected_figures_lock = selected_figures.lock().await;
-    selected_figures_lock.remove(&user_id);
+async fn unselect_all(user_id: Arc<str>, room_inner_lock: &mut MutexGuard<'_, RoomInner>) {
+    room_inner_lock.selected_figures.remove(&user_id);
 
-    let mut users_lock = users.lock().await;
     broadcast_except_for(
-        &mut users_lock,
+        &mut room_inner_lock.users,
         &user_id,
         ServerMessage::Notify(NotifyType::FigureUnselectedAll(user_id.to_string())),
     )
     .await;
+
     unicast(
-        &mut users_lock,
+        &mut room_inner_lock.users,
         &user_id,
         ServerMessage::Accepted(AcceptedType::FigureUnselectedAll),
     )
     .await;
-}
-
-fn select(
-    selected_figures_lock: &mut MutexGuard<'_, BTreeMap<Arc<str>, BTreeSet<usize>>>,
-    figures_lock: &MutexGuard<'_, BTreeMap<usize, FigureData>>,
-    user_id: &Arc<str>,
-    ids: BTreeSet<usize>,
-) -> (BTreeSet<usize>, BTreeSet<usize>) {
-    let mut accepted_set = BTreeSet::new();
-    let mut rejected_set = BTreeSet::new();
-
-    for id in ids {
-        if figures_lock.contains_key(&id) {
-            accepted_set.insert(id);
-        } else {
-            rejected_set.insert(id);
-        }
-    }
-
-    let backup = accepted_set.clone();
-    if let Some(item) = selected_figures_lock.get_mut(user_id) {
-        item.append(&mut accepted_set);
-    } else {
-        selected_figures_lock.insert(user_id.clone(), accepted_set);
-    }
-
-    (backup, rejected_set)
-}
-
-fn unselect(
-    selected_figures_lock: &mut MutexGuard<'_, BTreeMap<Arc<str>, BTreeSet<usize>>>,
-    figures_lock: &MutexGuard<'_, BTreeMap<usize, FigureData>>,
-    user_id: &Arc<str>,
-    ids: BTreeSet<usize>,
-) -> (BTreeSet<usize>, BTreeSet<usize>) {
-    let mut accepted_set = BTreeSet::new();
-    let mut rejected_set = BTreeSet::new();
-
-    for id in ids {
-        if figures_lock.contains_key(&id) {
-            accepted_set.insert(id);
-        } else {
-            rejected_set.insert(id);
-        }
-    }
-
-    if let Some(item) = selected_figures_lock.get_mut(user_id) {
-        for id in accepted_set.iter() {
-            item.remove(id);
-        }
-        if item.is_empty() {
-            selected_figures_lock.remove(user_id);
-        }
-    } else {
-        unreachable!()
-    }
-
-    (accepted_set, rejected_set)
 }
