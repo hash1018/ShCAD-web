@@ -6,17 +6,36 @@ use crate::figure::FigureData;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerMessage {
+    Accepted(AcceptedType),
+    PartialAccepted(AcceptedType, RejectedType),
+    Rejected(RejectedType),
+    Notify(NotifyType),
+    Response(ResponseType),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum AcceptedType {
+    UserJoined,
+    FigureUnselectedAll,
+    FigureSelected(BTreeSet<usize>),
+    SelectedFiguresUpdated(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum RejectedType {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum NotifyType {
     UserJoined(UserId),
     FigureAdded(usize, FigureData),
-    ResponseInfo(ResponseType),
     UserLeft(UserId),
-    NotifyUserMousePositionChanged(UserId, VecDeque<(f64, f64)>),
-    FigureSelected(UserId, BTreeSet<usize>),
+    UserMousePositionChanged(UserId, VecDeque<(f64, f64)>),
     FigureUnselectedAll(UserId),
-    NotifySelectDragStarted(UserId, f64, f64),
-    NotifySelectDragFinished(UserId),
+    SelectDragStarted(UserId, f64, f64),
+    SelectDragFinished(UserId),
+    FigureDeleted(BTreeSet<usize>),
+    FigureSelected(UserId, BTreeSet<usize>),
     SelectedFiguresUpdated(UserId, Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
-    FigureDeleted(UserId, BTreeSet<usize>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

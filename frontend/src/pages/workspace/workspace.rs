@@ -4,7 +4,10 @@ use std::{
     rc::Rc,
 };
 
-use lib::{figure::Figure, message::ServerMessage};
+use lib::{
+    figure::Figure,
+    message::{AcceptedType, NotifyType, ServerMessage},
+};
 use yew::{html, Component, Context, Properties};
 use yew_agent::{Bridge, Bridged};
 use yew_router::scope_ext::RouterScopeExt;
@@ -193,14 +196,92 @@ fn handle_server_message(
     msg: ServerMessage,
 ) -> Option<UpdateReason> {
     let update_reason = match msg {
-        ServerMessage::FigureAdded(id, data) => {
-            workspace
-                .figure_maintainer
-                .borrow_mut()
-                .insert_to_default(id, data.into());
-            Some(UpdateReason::FigureAdded)
-        }
-        ServerMessage::ResponseInfo(response_type) => match response_type {
+        ServerMessage::Notify(notify_message) => match notify_message {
+            NotifyType::FigureAdded(id, data) => {
+                workspace
+                    .figure_maintainer
+                    .borrow_mut()
+                    .insert_to_default(id, data.into());
+                Some(UpdateReason::FigureAdded)
+            }
+            NotifyType::UserJoined(user_id) => {
+                let new_user = SharedUser::new(user_id, false);
+                workspace.shared_users.push(new_user);
+                Some(UpdateReason::UserJoined)
+            }
+            NotifyType::UserLeft(user_id) => {
+                workspace.shared_users.remove(user_id);
+                Some(UpdateReason::UserLeft)
+            }
+            NotifyType::UserMousePositionChanged(user_id, queue) => {
+                workspace.shared_users.update_mouse_position(user_id, queue);
+                Some(UpdateReason::MousePositionChanged)
+            }
+            NotifyType::FigureUnselectedAll(user_id) => {
+                workspace
+                    .figure_maintainer
+                    .borrow_mut()
+                    .unselect_all_by_another_user(user_id);
+                Some(UpdateReason::FigureUnselectedAll)
+            }
+            NotifyType::SelectDragStarted(user_id, x, y) => {
+                workspace
+                    .shared_users
+                    .set_select_drag_position(user_id, Some((x, y)));
+
+                None
+            }
+            NotifyType::SelectDragFinished(user_id) => {
+                if user_id != user_name().unwrap() {
+                    workspace
+                        .shared_users
+                        .set_select_drag_position(user_id, None);
+                    Some(UpdateReason::SelectDragFinished)
+                } else {
+                    unreachable!()
+                }
+            }
+            NotifyType::FigureDeleted(deleted_ids) => {
+                let mut f_m_borrow_mut = workspace.figure_maintainer.borrow_mut();
+                f_m_borrow_mut.delete_to_default(&deleted_ids);
+                f_m_borrow_mut.unselect(&deleted_ids);
+                f_m_borrow_mut.try_unselect_by_all_users(&deleted_ids);
+
+                Some(UpdateReason::FigureDeleted)
+            }
+            NotifyType::FigureSelected(user_id, ids) => {
+                workspace
+                    .figure_maintainer
+                    .borrow_mut()
+                    .select_by_another_user(user_id, ids);
+
+                Some(UpdateReason::FigureSelected)
+            }
+            NotifyType::SelectedFiguresUpdated(
+                user_id,
+                new_selected_figures,
+                new_unselected_figures,
+            ) => {
+                if user_id != user_name().unwrap() {
+                    if let Some(new_selected_figures) = new_selected_figures {
+                        workspace
+                            .figure_maintainer
+                            .borrow_mut()
+                            .select_by_another_user(user_id.clone(), new_selected_figures);
+                    }
+                    if let Some(new_unselected_figures) = new_unselected_figures {
+                        workspace
+                            .figure_maintainer
+                            .borrow_mut()
+                            .unselect_by_another_user(user_id, new_unselected_figures);
+                    }
+                } else {
+                    unreachable!()
+                }
+                Some(UpdateReason::SelectedFiguresUpdated)
+            }
+        },
+        ServerMessage::Response(response_type) => match response_type {
             lib::message::ResponseType::CurrentFigures(datas) => {
                 if datas.is_empty() {
                     None
@@ -272,8 +353,8 @@ fn handle_server_message(
             }
             _ => None,
         },
-        ServerMessage::UserJoined(user_id) => {
-            if user_id == user_name().unwrap() {
+        ServerMessage::Accepted(accepted_type) => match accepted_type {
+            AcceptedType::UserJoined => {
                 if let Some(wss) = workspace.wss.as_ref() {
                     wss.send(lib::message::ClientMessage::RequestInfo(
                         lib::message::RequestType::CurrentSharedUsers,
@@ -292,66 +373,16 @@ fn handle_server_message(
                     ));
                 }
                 None
-            } else {
-                let new_user = SharedUser::new(user_id, false);
-                workspace.shared_users.push(new_user);
-                Some(UpdateReason::UserJoined)
             }
-        }
-        ServerMessage::UserLeft(user_id) => {
-            workspace.shared_users.remove(user_id);
-            Some(UpdateReason::UserLeft)
-        }
-        ServerMessage::NotifyUserMousePositionChanged(user_id, queue) => {
-            workspace.shared_users.update_mouse_position(user_id, queue);
-            Some(UpdateReason::MousePositionChanged)
-        }
-        ServerMessage::FigureSelected(user_id, ids) => {
-            if user_id == user_name().unwrap() {
-                workspace.figure_maintainer.borrow_mut().select(ids);
-            } else {
-                workspace
-                    .figure_maintainer
-                    .borrow_mut()
-                    .select_by_another_user(user_id, ids);
-            }
-            Some(UpdateReason::FigureSelected)
-        }
-        ServerMessage::FigureUnselectedAll(user_id) => {
-            if user_id == user_name().unwrap() {
+            AcceptedType::FigureUnselectedAll => {
                 workspace.figure_maintainer.borrow_mut().unselect_all();
-            } else {
-                workspace
-                    .figure_maintainer
-                    .borrow_mut()
-                    .unselect_all_by_another_user(user_id);
+                Some(UpdateReason::FigureUnselectedAll)
             }
-            Some(UpdateReason::FigureUnselectedAll)
-        }
-        ServerMessage::NotifySelectDragStarted(user_id, x, y) => {
-            if user_id != user_name().unwrap() {
-                workspace
-                    .shared_users
-                    .set_select_drag_position(user_id, Some((x, y)));
+            AcceptedType::FigureSelected(ids) => {
+                workspace.figure_maintainer.borrow_mut().select(ids);
+                Some(UpdateReason::FigureSelected)
             }
-            None
-        }
-        ServerMessage::NotifySelectDragFinished(user_id) => {
-            if user_id != user_name().unwrap() {
-                workspace
-                    .shared_users
-                    .set_select_drag_position(user_id, None);
-                Some(UpdateReason::SelectDragFinished)
-            } else {
-                None
-            }
-        }
-        ServerMessage::SelectedFiguresUpdated(
-            user_id,
-            new_selected_figures,
-            new_unselected_figures,
-        ) => {
-            if user_id == user_name().unwrap() {
+            AcceptedType::SelectedFiguresUpdated(new_selected_figures, new_unselected_figures) => {
                 if let Some(new_selected_figures) = new_selected_figures {
                     workspace
                         .figure_maintainer
@@ -364,30 +395,11 @@ fn handle_server_message(
                         .borrow_mut()
                         .unselect(&new_unselected_figures);
                 }
-            } else {
-                if let Some(new_selected_figures) = new_selected_figures {
-                    workspace
-                        .figure_maintainer
-                        .borrow_mut()
-                        .select_by_another_user(user_id.clone(), new_selected_figures);
-                }
-                if let Some(new_unselected_figures) = new_unselected_figures {
-                    workspace
-                        .figure_maintainer
-                        .borrow_mut()
-                        .unselect_by_another_user(user_id, new_unselected_figures);
-                }
+                Some(UpdateReason::SelectedFiguresUpdated)
             }
-            Some(UpdateReason::SelectedFiguresUpdated)
-        }
-        ServerMessage::FigureDeleted(_user_id, deleted_ids) => {
-            let mut f_m_borrow_mut = workspace.figure_maintainer.borrow_mut();
-            f_m_borrow_mut.delete_to_default(&deleted_ids);
-            f_m_borrow_mut.unselect(&deleted_ids);
-            f_m_borrow_mut.try_unselect_by_all_users(&deleted_ids);
-
-            Some(UpdateReason::FigureDeleted)
-        }
+        },
+        ServerMessage::PartialAccepted(_, _) => None,
+        ServerMessage::Rejected(_) => None,
     };
 
     update_reason

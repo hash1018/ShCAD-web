@@ -8,7 +8,7 @@ use std::{
 
 use lib::{
     figure::FigureData,
-    message::{RequestType, ResponseType, ServerMessage},
+    message::{AcceptedType, NotifyType, RequestType, ResponseType, ServerMessage},
 };
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
@@ -87,7 +87,9 @@ impl Room {
                             } else {
                                 broadcast(
                                     &mut users_lock,
-                                    ServerMessage::UserLeft(user_id.to_string()),
+                                    ServerMessage::Notify(NotifyType::UserLeft(
+                                        user_id.to_string(),
+                                    )),
                                 )
                                 .await;
                             }
@@ -107,14 +109,18 @@ impl Room {
 
                         figures_clone.lock().await.insert(new_id, data.clone());
                         let mut users_lock = users_clone.lock().await;
-                        broadcast(&mut users_lock, ServerMessage::FigureAdded(new_id, data)).await;
+                        broadcast(
+                            &mut users_lock,
+                            ServerMessage::Notify(NotifyType::FigureAdded(new_id, data)),
+                        )
+                        .await;
                     }
                     RoomMessage::RequestInfo(user_id, request_type) => match request_type {
                         RequestType::CurrentFigures => {
                             let mut users_lock = users_clone.lock().await;
                             let figures = figures_clone.lock().await.clone();
                             if let Some(user) = users_lock.get_mut(&user_id) {
-                                user.send_message(ServerMessage::ResponseInfo(
+                                user.send_message(ServerMessage::Response(
                                     ResponseType::CurrentFigures(figures),
                                 ))
                                 .await;
@@ -130,7 +136,7 @@ impl Room {
                             unicast(
                                 &mut users_lock,
                                 &user_id,
-                                ServerMessage::ResponseInfo(ResponseType::CurrentSharedUsers(vec)),
+                                ServerMessage::Response(ResponseType::CurrentSharedUsers(vec)),
                             )
                             .await;
                         }
@@ -146,9 +152,7 @@ impl Room {
                             unicast(
                                 &mut users_lock,
                                 &user_id,
-                                ServerMessage::ResponseInfo(ResponseType::CurrentSelectedFigures(
-                                    map,
-                                )),
+                                ServerMessage::Response(ResponseType::CurrentSelectedFigures(map)),
                             )
                             .await;
                         }
@@ -165,9 +169,9 @@ impl Room {
                             unicast(
                                 &mut users_lock,
                                 &user_id,
-                                ServerMessage::ResponseInfo(
-                                    ResponseType::CurrentSelectDragPositions(map),
-                                ),
+                                ServerMessage::Response(ResponseType::CurrentSelectDragPositions(
+                                    map,
+                                )),
                             )
                             .await;
                         }
@@ -183,10 +187,10 @@ impl Room {
                         broadcast_except_for(
                             &mut users_lock,
                             &user_id,
-                            ServerMessage::NotifyUserMousePositionChanged(
+                            ServerMessage::Notify(NotifyType::UserMousePositionChanged(
                                 user_id.to_string(),
                                 queue,
-                            ),
+                            )),
                         )
                         .await;
                     }
@@ -198,9 +202,20 @@ impl Room {
                             select(&mut selected_figures_lock, &figures_lock, &user_id, ids);
 
                         let mut users_lock = users_clone.lock().await;
-                        broadcast(
+                        broadcast_except_for(
                             &mut users_lock,
-                            ServerMessage::FigureSelected(user_id.to_string(), accepted_set),
+                            &user_id,
+                            ServerMessage::Notify(NotifyType::FigureSelected(
+                                user_id.to_string(),
+                                accepted_set.clone(),
+                            )),
+                        )
+                        .await;
+
+                        unicast(
+                            &mut users_lock,
+                            &user_id,
+                            ServerMessage::Accepted(AcceptedType::FigureSelected(accepted_set)),
                         )
                         .await;
                     }
@@ -217,7 +232,11 @@ impl Room {
                         broadcast_except_for(
                             &mut users_lock,
                             &user_id,
-                            ServerMessage::NotifySelectDragStarted(user_id.to_string(), x, y),
+                            ServerMessage::Notify(NotifyType::SelectDragStarted(
+                                user_id.to_string(),
+                                x,
+                                y,
+                            )),
                         )
                         .await;
                     }
@@ -230,7 +249,9 @@ impl Room {
                         broadcast_except_for(
                             &mut users_lock,
                             &user_id,
-                            ServerMessage::NotifySelectDragFinished(user_id.to_string()),
+                            ServerMessage::Notify(NotifyType::SelectDragFinished(
+                                user_id.to_string(),
+                            )),
                         )
                         .await;
                     }
@@ -268,17 +289,28 @@ impl Room {
                             };
 
                         let mut users_lock = users_clone.lock().await;
-                        broadcast(
+                        broadcast_except_for(
                             &mut users_lock,
-                            ServerMessage::SelectedFiguresUpdated(
+                            &user_id,
+                            ServerMessage::Notify(NotifyType::SelectedFiguresUpdated(
                                 user_id.to_string(),
+                                accepted_select_set.clone(),
+                                accepted_unselect_set.clone(),
+                            )),
+                        )
+                        .await;
+
+                        unicast(
+                            &mut users_lock,
+                            &user_id,
+                            ServerMessage::Accepted(AcceptedType::SelectedFiguresUpdated(
                                 accepted_select_set,
                                 accepted_unselect_set,
-                            ),
+                            )),
                         )
                         .await;
                     }
-                    RoomMessage::DeleteFigures(user_id, ids) => {
+                    RoomMessage::DeleteFigures(_user_id, ids) => {
                         let mut selected_figures_lock = selected_figures_clone.lock().await;
                         let mut remove_vec = Vec::new();
                         for (remove_id, set) in selected_figures_lock.iter_mut() {
@@ -302,7 +334,7 @@ impl Room {
                         let mut users_lock = users_clone.lock().await;
                         broadcast(
                             &mut users_lock,
-                            ServerMessage::FigureDeleted(user_id.to_string(), ids),
+                            ServerMessage::Notify(NotifyType::FigureDeleted(ids)),
                         )
                         .await;
                     }
@@ -318,9 +350,16 @@ impl Room {
         let mut users_lock = self.users.lock().await;
         users_lock.insert(new_user.id(), new_user);
 
-        broadcast(
+        broadcast_except_for(
             &mut users_lock,
-            ServerMessage::UserJoined(new_user_id.to_string()),
+            &new_user_id,
+            ServerMessage::Notify(NotifyType::UserJoined(new_user_id.to_string())),
+        )
+        .await;
+        unicast(
+            &mut users_lock,
+            &new_user_id,
+            ServerMessage::Accepted(AcceptedType::UserJoined),
         )
         .await;
     }
@@ -370,9 +409,16 @@ async fn unselect_all(
     selected_figures_lock.remove(&user_id);
 
     let mut users_lock = users.lock().await;
-    broadcast(
+    broadcast_except_for(
         &mut users_lock,
-        ServerMessage::FigureUnselectedAll(user_id.to_string()),
+        &user_id,
+        ServerMessage::Notify(NotifyType::FigureUnselectedAll(user_id.to_string())),
+    )
+    .await;
+    unicast(
+        &mut users_lock,
+        &user_id,
+        ServerMessage::Accepted(AcceptedType::FigureUnselectedAll),
     )
     .await;
 }
