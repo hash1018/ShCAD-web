@@ -19,6 +19,7 @@ pub enum AcceptedType {
     FigureUnselectedAll,
     FigureSelected(BTreeSet<usize>),
     SelectedFiguresUpdated(Option<BTreeSet<usize>>, Option<BTreeSet<usize>>),
+    FigureDeleted(BTreeSet<usize>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

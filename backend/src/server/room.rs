@@ -16,7 +16,10 @@ use tokio::sync::{
 };
 use tracing::log;
 
-use crate::syncing_system::selection::{select, unselect};
+use crate::syncing_system::{
+    deletion::delete,
+    selection::{select, unselect},
+};
 
 use super::{user::User, ServerAppMessage};
 
@@ -286,30 +289,22 @@ impl Room {
                         )
                         .await;
                     }
-                    RoomMessage::DeleteFigures(_user_id, ids) => {
+                    RoomMessage::DeleteFigures(user_id, ids) => {
                         let mut room_inner_lock = room_inner.lock().await;
 
-                        let mut remove_vec = Vec::new();
-                        for (remove_id, set) in room_inner_lock.selected_figures.iter_mut() {
-                            for i in ids.iter() {
-                                set.remove(i);
-                            }
-                            if set.is_empty() {
-                                remove_vec.push(remove_id.clone());
-                            }
-                        }
+                        let (accpeted_set, _rejected_set) = delete(&mut room_inner_lock, ids);
 
-                        for remove_id in remove_vec {
-                            room_inner_lock.selected_figures.remove(&remove_id);
-                        }
-
-                        for id in ids.iter() {
-                            room_inner_lock.figures.remove(id);
-                        }
-
-                        broadcast(
+                        broadcast_except_for(
                             &mut room_inner_lock.users,
-                            ServerMessage::Notify(NotifyType::FigureDeleted(ids)),
+                            &user_id,
+                            ServerMessage::Notify(NotifyType::FigureDeleted(accpeted_set.clone())),
+                        )
+                        .await;
+
+                        unicast(
+                            &mut room_inner_lock.users,
+                            &user_id,
+                            ServerMessage::Accepted(AcceptedType::FigureDeleted(accpeted_set)),
                         )
                         .await;
                     }

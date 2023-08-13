@@ -397,6 +397,14 @@ fn handle_server_message(
                 }
                 Some(UpdateReason::SelectedFiguresUpdated)
             }
+            AcceptedType::FigureDeleted(ids) => {
+                let mut f_m_borrow_mut = workspace.figure_maintainer.borrow_mut();
+                f_m_borrow_mut.delete_to_default(&ids);
+                f_m_borrow_mut.unselect(&ids);
+                f_m_borrow_mut.try_unselect_by_all_users(&ids);
+
+                Some(UpdateReason::FigureDeleted)
+            }
         },
         ServerMessage::PartialAccepted(_, _) => None,
         ServerMessage::Rejected(_) => None,
