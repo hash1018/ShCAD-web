@@ -404,6 +404,10 @@ impl SharedUser {
         self.color = Some(color);
     }
 
+    pub fn color(&self) -> Option<Color> {
+        self.color
+    }
+
     fn set_mouse_position_queue(&mut self, mut mouse_position_queue: VecDeque<(f64, f64)>) {
         self.mouse_position_queue.append(&mut mouse_position_queue);
         let len = self.mouse_position_queue.len();

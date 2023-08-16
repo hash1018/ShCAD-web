@@ -121,17 +121,16 @@ impl Workspace {
         let show_chat = self.show_chat;
         let current_mode = self.current_mode;
         let handler_clone = handler.clone();
-        let handler_clone2 = handler.clone();
         let figure_maintainer = self.figure_maintainer.clone();
         let update_reason = self.update_reason.clone();
         let shared_users = self.shared_users.clone();
 
         html! {
             <body>
-                <div class="top"> <TitleBar {handler} {show_chat} /> </div>
+                <div class="top"> <TitleBar {handler} {show_chat} update_reason={update_reason.clone()} shared_users={shared_users.clone()} /> </div>
                 <div class="content">
-                    <DrawArea handler = {handler_clone} {current_mode} {figure_maintainer} {update_reason} {shared_users} />
-                    <div class="left"> <ToolBox handler = {handler_clone2} {current_mode} /> </div>
+                    <DrawArea handler = {handler_clone.clone()} {current_mode} {figure_maintainer} {update_reason} {shared_users} />
+                    <div class="left"> <ToolBox handler = {handler_clone} {current_mode} /> </div>
                     if show_chat {
                         <div class="chat_position"> <Chat /> </div>
                     }
@@ -301,9 +300,6 @@ fn handle_server_message(
                 let my_name = user_name().unwrap();
                 if let Some(position) = users.iter().position(|name| *name == my_name) {
                     users.remove(position);
-                    let me = SharedUser::new(my_name, true);
-                    workspace.shared_users.push(me);
-
                     if users.is_empty() {
                         None
                     } else {
@@ -355,6 +351,9 @@ fn handle_server_message(
         },
         ServerMessage::Accepted(accepted_type) => match accepted_type {
             AcceptedType::UserJoined => {
+                let me = SharedUser::new(user_name().unwrap(), true);
+                workspace.shared_users.push(me);
+
                 if let Some(wss) = workspace.wss.as_ref() {
                     wss.send(lib::message::ClientMessage::RequestInfo(
                         lib::message::RequestType::CurrentSharedUsers,
@@ -372,7 +371,7 @@ fn handle_server_message(
                         lib::message::RequestType::CurrentSelectDragPositions,
                     ));
                 }
-                None
+                Some(UpdateReason::UserJoined)
             }
             AcceptedType::FigureUnselectedAll => {
                 workspace.figure_maintainer.borrow_mut().unselect_all();
